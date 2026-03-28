@@ -1088,3 +1088,11 @@ Quando precisar de padrões de código completos, SQL avançado, ou checklists d
 | `references/advanced-rls.md` | Padrões multi-tenant (user_id, tenant_id via JWT, equipes/orgs); `(SELECT auth.uid())` performance; índices; event trigger auto-RLS; comportamentos silenciosos; RBAC via Custom Access Token Hook; `app_metadata` vs `user_metadata`; pgTap testing |
 | `references/infrastructure.md` | OWASP Top 10 aplicado ao Supabase; CSP header completo; Dashboard hardening checklist; rate limits padrão do Auth; GitHub Actions security scan; schema exposure e permissões |
 | `CHANGELOG.md` | Histórico completo de versões da skill — leia antes de fazer qualquer atualização futura |
+| `README.md` | Documentação pública do repositório GitHub — **deve ser atualizado** sempre que uma nova versão for criada |
+
+## Regra de atualização do README.md
+
+Sempre que esta skill for atualizada (nova versão, nova task, nova categoria), o `README.md` deve ser atualizado para refletir:
+- Versão atual no topo
+- Nova entrada no Changelog
+- Novas linhas na tabela de cobertura (se houver novas tasks)
