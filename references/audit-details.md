@@ -8,6 +8,8 @@ Referência completa com SQL queries, padrões de código e exemplos de correç�
 - [Seções P2 — Médio](#p2)
 - [Ferramentas complementares](#ferramentas)
 
+> **v1.6:** Adicionadas seções — Enumeração de usuários, Input size limits, Rate limiting honeypots, Race conditions (cenários concretos), Upload (IP trackers), Testes de segurança TDD
+
 ---
 
 ## P0 — Crítico {#p0}
@@ -78,6 +80,68 @@ security-report/
 ```
 
 > `security-report/` é obrigatório: o relatório de auditoria pode conter detalhes de vulnerabilidades encontradas e nunca deve ser commitado.
+
+---
+
+### Enumeração de usuários
+
+Formulários de autenticação que retornam mensagens diferentes para e-mail inexistente vs. senha errada permitem que atacantes enumerem usuários cadastrados automaticamente.
+
+**Padrões a buscar:**
+```bash
+grep -rn "não encontrado\|not found\|email.*inexistente\|email.*not.*exist\
+\|user.*not.*found\|invalid email\|wrong password\|senha incorreta\
+\|incorrect password\|no account\|conta não existe" \
+  src/ app/ pages/ --include="*.ts" --include="*.tsx" --include="*.js"
+```
+
+**Também verificar endpoint de recuperação de senha:**
+```bash
+grep -rn "reset.*password\|forgot.*password\|recuperar.*senha\|redefinir.*senha" \
+  src/ app/ --include="*.ts" --include="*.tsx" -l
+```
+Inspecionar: o endpoint retorna "e-mail não encontrado" ou uma mensagem genérica?
+
+**Correções por contexto:**
+
+Login (Supabase Auth):
+```typescript
+// Supabase Auth já retorna erro genérico por padrão:
+const { error } = await supabase.auth.signInWithPassword({ email, password })
+// error.message = "Invalid login credentials" — ✅ genérico
+// NÃO customizar essa mensagem para ser mais específica
+if (error) return { error: "Credenciais inválidas. Verifique seu e-mail e senha." }
+```
+
+Auth customizada (se o projeto não usa Supabase Auth):
+```typescript
+// ❌ Vulnerável
+const user = await db.users.findOne({ email })
+if (!user) return { error: "E-mail não encontrado" }         // revela existência
+if (!await bcrypt.compare(password, user.password_hash))
+  return { error: "Senha incorreta" }                         // revela que e-mail existe
+
+// ✅ Seguro — mesma mensagem, mesmo tempo de resposta
+const user = await db.users.findOne({ email })
+const passwordMatch = user
+  ? await bcrypt.compare(password, user.password_hash)
+  : await bcrypt.compare(password, DUMMY_HASH) // previne timing attack
+if (!user || !passwordMatch)
+  return { error: "Credenciais inválidas. Verifique seu e-mail e senha." }
+```
+
+Recuperação de senha:
+```typescript
+// ❌ Vulnerável
+const user = await db.users.findOne({ email })
+if (!user) return { error: "Nenhuma conta encontrada com esse e-mail" }
+
+// ✅ Seguro — sempre a mesma resposta
+return { message: "Se esse e-mail estiver cadastrado, você receberá um link em breve." }
+// (enviar e-mail em background apenas se o usuário existir)
+```
+
+**Nota sobre Supabase Auth**: se usando `supabase.auth.resetPasswordForEmail()`, o Supabase já retorna resposta genérica por padrão. Não altere esse comportamento.
 
 ---
 
@@ -371,6 +435,211 @@ export async function rateLimitMiddleware(request: Request) {
 - OTP: máximo 30/hora
 - Password recovery: máximo 3/hora
 
+**Rate limiting por endpoint (limites diferentes por criticidade):**
+```typescript
+// Configurar limitadores separados por endpoint
+const loginRatelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(5, "1 m"),   // login: 5 tentativas/minuto
+  prefix: "ratelimit_login"
+})
+
+const searchRatelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(100, "1 m"),  // busca: 100/minuto
+  prefix: "ratelimit_search"
+})
+
+// Endpoints de maior risco precisam de limites mais restritivos:
+// POST /login, /signup, /reset-password → 5/min por IP
+// POST /api/upload → 10/min por usuário
+// GET /api/search → 100/min por IP
+```
+
+**Honeypots — rotas falsas para detectar scanners:**
+```typescript
+// app/api/admin-backup/route.ts — rota honeypot
+// Qualquer acesso a esta rota é automaticamente suspeito
+export async function GET(request: Request) {
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
+  // Log e bloquear o IP no Redis por 24h
+  await redis.set(`honeypot_blocked_${ip}`, true, { ex: 86400 })
+  console.warn(`[HONEYPOT] Acesso suspeito de IP: ${ip}`)
+  // Retornar resposta plausível para não alertar o atacante
+  return Response.json({ error: 'Unauthorized' }, { status: 401 })
+}
+```
+Rotas honeypot úteis: `/api/admin-backup`, `/api/export-users`, `/.env`, `/api/debug`
+
+---
+
+### Input size limits — Prevenção de DoS via storage
+
+Campos sem limite de tamanho permitem que atacantes injetem dados enormes que consomem armazenamento, processamento e memória.
+
+**Auditoria rápida — campos sem .max():**
+```bash
+# Procurar schemas Zod sem .max() em campos de texto
+grep -rn "z\.string()" src/ app/ --include="*.ts" --include="*.tsx" | grep -v "\.max("
+
+# Procurar tabelas com colunas TEXT sem CHECK constraint
+# (executar no SQL Editor do Supabase):
+```
+```sql
+-- Listar colunas TEXT/VARCHAR sem constraints de tamanho:
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND data_type IN ('text', 'character varying')
+  AND character_maximum_length IS NULL
+ORDER BY table_name, column_name;
+```
+
+**Correção — Zod no servidor (primeira linha de defesa):**
+```typescript
+const ProfileSchema = z.object({
+  name:        z.string().min(1).max(100).trim(),
+  username:    z.string().min(3).max(30).regex(/^[a-z0-9_-]+$/i),
+  bio:         z.string().max(500).optional(),
+  website:     z.string().url().max(200).optional(),
+  location:    z.string().max(100).optional(),
+})
+
+const MessageSchema = z.object({
+  content:     z.string().min(1).max(2000),
+  subject:     z.string().max(200).optional(),
+})
+
+const CommentSchema = z.object({
+  body:        z.string().min(1).max(1000),
+})
+
+// Referência rápida de limites recomendados:
+// name/title: max 200
+// bio/description: max 500
+// message/comment: max 2000
+// email: max 254 (RFC 5321)
+// slug/username: max 100
+// URL: max 2048
+// address line: max 200
+```
+
+**Correção — CHECK constraints no banco (segunda linha de defesa):**
+```sql
+-- Adicionar constraints para os campos mais críticos
+ALTER TABLE public.profiles
+  ADD CONSTRAINT name_max_length CHECK (length(name) <= 100),
+  ADD CONSTRAINT bio_max_length CHECK (length(bio) <= 500);
+
+ALTER TABLE public.messages
+  ADD CONSTRAINT content_max_length CHECK (length(content) <= 2000);
+
+ALTER TABLE public.posts
+  ADD CONSTRAINT title_max_length CHECK (length(title) <= 200),
+  ADD CONSTRAINT body_max_length CHECK (length(body) <= 50000);
+```
+
+---
+
+### Testes automatizados de segurança
+
+**Verificar cobertura existente:**
+```bash
+# Procurar arquivos de teste
+find . -name "*.test.ts" -o -name "*.spec.ts" -o -name "*.test.tsx" \
+  | grep -v node_modules
+
+# Verificar se há testes de autenticação/autorização
+grep -rn "unauthorized\|forbidden\|401\|403\|idor\|access.*denied" \
+  --include="*.test.*" --include="*.spec.*" .
+```
+
+**Template de testes de segurança (Vitest/Jest):**
+```typescript
+// __tests__/security/idor.test.ts
+import { describe, it, expect, beforeAll } from 'vitest'
+
+describe('IDOR Prevention', () => {
+  let userAToken: string
+  let userBToken: string
+  let userBResourceId: string
+
+  beforeAll(async () => {
+    // Setup: criar dois usuários e um recurso do usuário B
+    userAToken = await signIn('user-a@test.com', 'password')
+    userBToken = await signIn('user-b@test.com', 'password')
+    const resource = await createResource(userBToken, { title: 'User B resource' })
+    userBResourceId = resource.id
+  })
+
+  it('should not allow user A to read user B resource', async () => {
+    const res = await fetch(`/api/resources/${userBResourceId}`, {
+      headers: { Authorization: `Bearer ${userAToken}` }
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('should not allow user A to update user B resource', async () => {
+    const res = await fetch(`/api/resources/${userBResourceId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${userAToken}` },
+      body: JSON.stringify({ title: 'Hijacked' })
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('should not allow user A to delete user B resource', async () => {
+    const res = await fetch(`/api/resources/${userBResourceId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${userAToken}` }
+    })
+    expect(res.status).toBe(403)
+  })
+})
+
+describe('Auth Protection', () => {
+  it('should reject requests without token', async () => {
+    const res = await fetch('/api/protected-endpoint')
+    expect(res.status).toBe(401)
+  })
+
+  it('should reject requests with invalid token', async () => {
+    const res = await fetch('/api/protected-endpoint', {
+      headers: { Authorization: 'Bearer invalid-token' }
+    })
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('Input Validation', () => {
+  it('should reject oversized input', async () => {
+    const token = await signIn('user@test.com', 'password')
+    const res = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bio: 'a'.repeat(10000) }) // muito maior que o limite
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('should reject XSS in input fields', async () => {
+    const token = await signIn('user@test.com', 'password')
+    const res = await fetch('/api/posts', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '<script>alert(1)</script>', body: 'test' })
+    })
+    // Deve ou rejeitar (400) ou sanitizar — nunca armazenar o script bruto
+    if (res.ok) {
+      const post = await res.json()
+      expect(post.title).not.toContain('<script>')
+    } else {
+      expect(res.status).toBe(400)
+    }
+  })
+})
+```
+
 ---
 
 ### XSS — Sanitização
@@ -594,6 +863,117 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 **ERRADO — soft delete não atende LGPD:**
 ```sql
 UPDATE users SET deleted_at = NOW() WHERE id = user_id -- dados ainda existem
+```
+
+---
+
+### Race Conditions — Cenários concretos de lógica de negócio
+
+Esta é a categoria onde a IA mais falha em vibe-coding. Pense em fluxos absurdos que combinam ações legítimas:
+
+**Cenários a investigar no projeto:**
+
+| Cenário | Pergunta a fazer |
+|---------|-----------------|
+| Compra + reembolso + comissão | Ao solicitar reembolso, a comissão do afiliado é revertida? |
+| Duplo clique em "Comprar" | O usuário pode comprar duas vezes simultaneamente? |
+| Cupom de desconto | Pode usar o mesmo cupom em duas sessões paralelas? |
+| Saldo/créditos | Pode debitar mais do que tem se duas requisições chegam ao mesmo tempo? |
+| Bônus de indicação | Pode indicar a si mesmo via e-mail alternativo? |
+| Trial gratuito | Pode criar conta, cancelar, recriar e ter novo trial? |
+| Webhook de pagamento | O que acontece se o webhook chegar duas vezes (retentativa)? |
+
+**Padrão vulnerável — janela de race condition:**
+```typescript
+// ❌ Duas operações separadas — atacante pode explorar a janela entre elas
+const balance = await getBalance(userId)           // query 1
+if (balance >= amount) {
+  await deductBalance(userId, amount)              // query 2 — race condition aqui
+  await creditSeller(sellerId, amount)             // query 3
+}
+// Um atacante com duas requisições simultâneas pode executar ambas
+// quando o saldo ainda não foi debitado
+```
+
+**Padrão seguro — operação atômica:**
+```sql
+-- Tudo em uma única transaction com verificação e ação combinadas
+CREATE OR REPLACE FUNCTION process_purchase(
+  p_buyer_id uuid,
+  p_seller_id uuid,
+  p_amount numeric,
+  p_idempotency_key text
+)
+RETURNS jsonb
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_balance numeric;
+BEGIN
+  -- Prevenir duplicatas via idempotency key
+  INSERT INTO transactions (idempotency_key, buyer_id, seller_id, amount, status)
+  VALUES (p_idempotency_key, p_buyer_id, p_seller_id, p_amount, 'processing')
+  ON CONFLICT (idempotency_key) DO NOTHING;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'duplicate', 'message', 'Transação já processada');
+  END IF;
+
+  -- Debitar e verificar saldo na mesma operação atômica
+  UPDATE wallets
+  SET balance = balance - p_amount
+  WHERE user_id = p_buyer_id AND balance >= p_amount;
+
+  IF NOT FOUND THEN
+    -- Reverter a transaction marcada como processing
+    DELETE FROM transactions WHERE idempotency_key = p_idempotency_key;
+    RETURN jsonb_build_object('status', 'error', 'message', 'Saldo insuficiente');
+  END IF;
+
+  -- Creditar vendedor
+  UPDATE wallets SET balance = balance + p_amount WHERE user_id = p_seller_id;
+
+  -- Marcar como concluída
+  UPDATE transactions SET status = 'completed' WHERE idempotency_key = p_idempotency_key;
+
+  RETURN jsonb_build_object('status', 'success');
+END;
+$$;
+```
+
+**Verificar no código:**
+```bash
+# Operações financeiras fora de transactions/RPCs
+grep -rn "supabase\.from.*update\|supabase\.from.*insert" \
+  src/ app/ --include="*.ts" --include="*.tsx" | grep -i "balance\|credit\|debit\|payment\|wallet\|bonus"
+
+# Verificar se há chamadas a .rpc() para operações financeiras (bom sinal)
+grep -rn "\.rpc(" src/ app/ --include="*.ts" --include="*.tsx"
+```
+
+**Idempotency em webhooks (Stripe/pagamentos):**
+```typescript
+// Edge Function para webhook de pagamento
+const processedEvents = new Set() // ou Redis em produção
+
+export async function POST(req: Request) {
+  const event = await parseWebhook(req)
+
+  // Verificar se já processamos este evento
+  const { data: existing } = await supabase
+    .from('processed_webhooks')
+    .select('id')
+    .eq('event_id', event.id)
+    .single()
+
+  if (existing) return Response.json({ status: 'already_processed' })
+
+  // Processar e registrar atomicamente
+  await supabase.rpc('process_payment_event', {
+    event_id: event.id,
+    event_type: event.type,
+    payload: event.data
+  })
+}
 ```
 
 ---

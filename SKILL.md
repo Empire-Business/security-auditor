@@ -23,6 +23,29 @@ Tudo que roda no navegador do usuário é público. Qualquer pessoa pode abrir o
 
 Tenha essa mentalidade de "zero trust no cliente" durante toda a auditoria.
 
+## Modo Preventivo — se o usuário ainda está construindo o app
+
+Se o usuário pediu a auditoria **antes** de codificar (ou no início do projeto), compartilhe este prompt template que ele pode usar com a IA para construir com segurança desde o início:
+
+```
+"Este sistema será submetido a um pentest profissional.
+Aplique defesa em profundidade — cada camada deve ser
+independentemente segura, mesmo que outra falhe.
+Stack: React + TypeScript + Supabase + Vercel.
+Regras obrigatórias:
+- Toda lógica de permissão e cálculo financeiro fica no servidor (Edge Functions / Server Actions)
+- Nunca confiar no frontend — toda validação ocorre no backend
+- Transações financeiras e mudanças de estado crítico usam operações atômicas
+- Somente usuários autorizados acessam recursos específicos (verificar IDOR)
+- Limite máximo de tamanho em todos os campos de input"
+```
+
+A maior alavanca de segurança está no prompt — não no código. Uma instrução clara antes de começar evita reescritas custosas depois.
+
+Se o app já está construído, prossiga com a auditoria abaixo.
+
+---
+
 ## Passo 1: Criar o plano de trabalho com tasks
 
 **IMEDIATAMENTE ao ser acionado**, use `TaskCreate` para criar tasks cobrindo TODAS as categorias abaixo. Crie cada task com sujeito descritivo e status inicial `pending`. Isso dá visibilidade ao usuário sobre o que será feito.
@@ -33,6 +56,7 @@ Crie as tasks nesta ordem de prioridade:
 P0 — CRÍTICO (corrija hoje):
   1. [P0] Auditar e corrigir: Segredos & Variáveis de Ambiente
   1b. [P0] Auditar e corrigir: service_role — remover do projeto e migrar para Access Tokens temporários (7 dias)
+  1c. [P0] Auditar e corrigir: Enumeração de usuários via mensagens de erro de autenticação
   2. [P0] Auditar e corrigir: Git & .gitignore (segredos commitados)
   3. [P0] Auditar e corrigir: Rotas privadas & autenticação
   3b. [P0] Auditar e corrigir: getSession() vs getUser() + CVE-2025-29927 middleware bypass
@@ -54,6 +78,8 @@ P1 — ALTO (corrija esta semana):
  16. [P1] Auditar e corrigir: Criptografia de dados sensíveis
  17. [P1] Auditar e corrigir: CORS & Security Headers (vercel.json)
  18. [P1] Auditar e corrigir: Rate limiting & proteção anti-brute-force
+ 18b. [P1] Auditar e corrigir: Limite máximo de tamanho para todos os inputs (DoS prevenção)
+ 18c. [P1] Auditar e corrigir: Testes automatizados de segurança (gerar suite TDD)
  19. [P1] Auditar e corrigir: Injeção SQL, XSS & Prototype Pollution
  20. [P1] Auditar e corrigir: Supabase Realtime & subscriptions
  20b. [P1] Auditar e corrigir: Arquitetura cliente-servidor — lógica sensível exposta no frontend
@@ -149,6 +175,27 @@ Se encontrar resultados fora dessas pastas permitidas, é P0 — alerte o usuár
 1. Revogar e regenerar a service_role key imediatamente no Dashboard → Settings → API
 2. Verificar se há commits com a chave no histórico git
 3. Substituir pelo padrão de Access Token temporário descrito acima
+
+#### 1c. Enumeração de usuários via mensagens de erro
+A IA frequentemente gera mensagens de erro úteis para o desenvolvedor — mas que revelam informação ao atacante. Mensagens como "E-mail não encontrado" ou "Senha incorreta" permitem que um atacante saiba quais e-mails estão cadastrados no sistema (enumeração de usuários).
+
+- **Procure** em formulários de login, registro e recuperação de senha:
+  ```bash
+  grep -rn "não encontrado\|not found\|email.*inexistente\|usuário.*não existe\|invalid email\|wrong password\|senha incorreta" \
+    src/ app/ --include="*.ts" --include="*.tsx"
+  ```
+- **Risco**: um atacante pode automatizar tentativas com listas de e-mails e saber exatamente quais estão cadastrados — depois usa isso para phishing direcionado ou credential stuffing
+- **Correção**: substituir todas as mensagens de erro de autenticação por uma mensagem genérica:
+  ```typescript
+  // ❌ Perigoso — revela se o e-mail existe
+  if (!user) return { error: "E-mail não encontrado" }
+  if (!passwordMatch) return { error: "Senha incorreta" }
+
+  // ✅ Seguro — mesma mensagem para qualquer falha
+  return { error: "Credenciais inválidas. Verifique seu e-mail e senha." }
+  ```
+- **Também verificar**: endpoints de recuperação de senha — não revelar se o e-mail está cadastrado. Retornar sempre "Se esse e-mail estiver cadastrado, você receberá um link em breve."
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Enumeração de usuários"
 
 #### 2. Git & .gitignore
 - **Procure**: `.gitignore` na raiz
@@ -404,6 +451,7 @@ Para padrões multi-tenant completos e event trigger de auto-RLS, consulte `refe
 #### 18. Rate limiting
 - **Procure**: endpoints de login, signup, password reset sem rate limiting
 - **Verificar**: Supabase Dashboard → Authentication → Rate Limits estão configurados
+- **Diferentes limites por endpoint**: login deve ter limite mais restritivo (5 tentativas/minuto por IP) do que busca (100/minuto)
 - **Correção com Upstash** (se não houver rate limiting):
   ```typescript
   // Em middleware.ts ou Edge Function
@@ -413,6 +461,63 @@ Para padrões multi-tenant completos e event trigger de auto-RLS, consulte `refe
   const { success } = await ratelimit.limit(ip);
   if (!success) return new Response("Too Many Requests", { status: 429 });
   ```
+- **Honeypots (opcional, alta eficácia)**: adicionar rotas falsas que retornam dados plausíveis mas inúteis para atacantes que fazem scanning automático. Um atacante que acerta a rota honeypot pode ser automaticamente bloqueado.
+- Para detalhes de configuração de limites por endpoint, veja `references/audit-details.md` → seção "Rate limiting"
+
+#### 18b. Limite máximo de tamanho para todos os inputs
+Inputs sem limite de tamanho são um vetor de DoS — um atacante pode enviar campos de 10MB repetidamente, consumindo memória, processamento de banco e armazenamento.
+
+- **Procure**: campos de formulário e API sem validação de tamanho máximo:
+  ```bash
+  # Procurar schemas Zod sem .max()
+  grep -rn "z\.string()\." src/ app/ --include="*.ts" --include="*.tsx" | grep -v "\.max("
+  ```
+- **Risco**: campos de texto ilimitados podem causar degradação de performance e gastos inesperados com storage
+- **Correção — Zod no servidor**:
+  ```typescript
+  const schema = z.object({
+    name: z.string().max(100),        // nome
+    bio: z.string().max(500),         // bio
+    message: z.string().max(2000),    // mensagem longa
+    email: z.string().email().max(254), // email (RFC 5321)
+    slug: z.string().max(100).regex(/^[a-z0-9-]+$/),
+  })
+  ```
+- **Correção — constraint no banco** (defesa em profundidade):
+  ```sql
+  ALTER TABLE public.profiles ADD CONSTRAINT bio_max_length CHECK (length(bio) <= 500);
+  ALTER TABLE public.messages ADD CONSTRAINT content_max_length CHECK (length(content) <= 2000);
+  ```
+- Campos críticos: `bio`, `description`, `comment`, `message`, `title`, `name`, `address`
+- Para padrões completos, veja `references/audit-details.md` → seção "Input size limits"
+
+#### 18c. Testes automatizados de segurança
+A IA que construiu o app pode também gerar os testes de segurança — e isso é uma das práticas mais eficazes para garantir que novas features não introduzam regressões de segurança.
+
+Se o projeto tem uma suíte de testes, verifique se há cobertura para cenários de segurança. Se não houver, gere os testes essenciais:
+
+- **Verificar se existe** `*.test.ts`, `*.spec.ts`, `__tests__/`:
+  ```bash
+  find . -name "*.test.ts" -o -name "*.spec.ts" | grep -v node_modules | head -20
+  ```
+- **Cenários de segurança que devem ter teste**:
+  - Acesso a recurso de outro usuário retorna 403 (IDOR)
+  - Endpoint sem autenticação retorna 401
+  - Input com caracteres especiais `<script>`, `'; DROP TABLE`, `../../../etc/passwd` é rejeitado
+  - Rate limiting bloqueia após N tentativas
+  - Upload de arquivo com extensão .exe ou .php é rejeitado
+- **Gerar teste de IDOR** (exemplo Vitest/Jest):
+  ```typescript
+  it('should not allow user A to access user B resources', async () => {
+    const userAToken = await signIn(userA)
+    const userBResourceId = await createResource(userB)
+    const response = await fetch(`/api/resources/${userBResourceId}`, {
+      headers: { Authorization: `Bearer ${userAToken}` }
+    })
+    expect(response.status).toBe(403)
+  })
+  ```
+- Se não há framework de testes configurado, **reporte apenas** e liste os cenários que deveriam ser cobertos — não instale um framework de testes sem orientação do usuário
 
 #### 19. Injeção SQL, XSS, Prototype Pollution
 - **Procure**: template literals em SQL: `` `SELECT * FROM ${table}` ``
@@ -532,6 +637,20 @@ Para políticas completas de Realtime, consulte `references/audit-details.md` �
 - **Procure no frontend**: validação apenas por extensão (inseguro) vs. magic bytes
 - **Tipos NUNCA aceitar**: `.svg`, `.html`, `.php`, `.exe`, `.sh`
 - **Correção**: gerar nome UUID para arquivos `${crypto.randomUUID()}.${ext}` e usar signed URLs
+- **Risco extra — URLs externas como IP trackers**: se o app permite que usuários insiram URLs de imagem (avatar, banner, etc.) sem validação de domínio, um atacante pode inserir uma URL de servidor controlado por ele. Quando outros usuários carregarem a página, seus IPs serão capturados pelo servidor do atacante.
+  ```typescript
+  // Verificar: o app aceita URLs externas para imagens de perfil?
+  grep -rn "avatar_url\|image_url\|banner_url\|photo_url" src/ app/ --include="*.ts" --include="*.tsx"
+  // Correção: validar que a URL pertence ao seu domínio ou ao Supabase Storage
+  const isValidImageUrl = (url: string) => {
+    const allowed = ['seu-projeto.supabase.co', 'seu-dominio.com']
+    try {
+      const parsed = new URL(url)
+      return allowed.some(domain => parsed.hostname.endsWith(domain))
+    } catch { return false }
+  }
+  ```
+- Para validação de magic bytes e padrões detalhados, veja `references/audit-details.md` → seção "Upload de arquivos"
 
 #### 22. CSP & SRI
 - **Procure**: `<script src="https://...">` sem atributo `integrity` no HTML/layout
@@ -558,15 +677,47 @@ Para políticas completas de Realtime, consulte `references/audit-details.md` �
 - **Risco**: qualquer acesso de `anon` ou `authenticated` ao schema `vault`
 
 #### 25. Lógica de negócio & race conditions
+A IA erra mais nesta categoria do que em qualquer outra. Fluxos de negócio complexos têm combinações não-óbvias que criam brechas — e a IA só cobre os casos que você descreve explicitamente.
+
 - **Procure**: cálculo de preço no frontend (nunca confiar no cliente)
 - **Procure**: ausência de idempotency keys em operações de pagamento
-- **Correção para race condition**:
+- **Questione estes fluxos absurdos** — se existirem no app, teste cada um:
+  - Um usuário compra → solicita reembolso → a comissão de afiliado ainda é creditada?
+  - Um usuário pode submeter o mesmo formulário duas vezes simultaneamente e ganhar o benefício duas vezes (race condition de estado)?
+  - Existe algum fluxo onde combinar ações legítimas resulta em ganho de recurso infinito? (ex: criar → deletar → recriar com bônus novamente)
+  - Um usuário pode usar um cupom de desconto enquanto simultaneamente inicia outro checkout com o mesmo cupom?
+- **Race condition — padrão vulnerável vs seguro**:
+  ```typescript
+  // ❌ Vulnerável: duas operações separadas — janela de exploração entre elas
+  const balance = await getBalance(userId)    // lê saldo
+  if (balance >= amount) {
+    await deductBalance(userId, amount)       // debita — race condition aqui
+  }
+
+  // ✅ Seguro: verificar e agir na mesma operação atômica
+  await supabase.rpc('deduct_balance_atomic', { user_id: userId, amount })
+  ```
   ```sql
-  -- Usar advisory locks ou constraints UNIQUE para evitar duplicatas
+  -- Função atômica com lock e verificação dentro da transaction
+  CREATE OR REPLACE FUNCTION deduct_balance_atomic(user_id uuid, amount numeric)
+  RETURNS void LANGUAGE plpgsql AS $$
+  BEGIN
+    UPDATE wallets
+    SET balance = balance - amount
+    WHERE id = user_id AND balance >= amount; -- verificação + débito em uma operação
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Saldo insuficiente';
+    END IF;
+  END;
+  $$;
+  ```
+- **Correção para duplicatas** (idempotency):
+  ```sql
   INSERT INTO user_bonuses (user_id, bonus_type)
   VALUES (auth.uid(), 'welcome')
   ON CONFLICT (user_id, bonus_type) DO NOTHING;
   ```
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Race conditions"
 
 #### 26. LGPD/GDPR
 - **Procure**: funcionalidade de "deletar minha conta" — o delete remove todos os dados ou apenas desativa?
@@ -890,6 +1041,24 @@ Se alguma verificação falhou:
 4. Documente no relatório de auditoria (`security-report/`) a falha e a correção adicional
 
 Se tudo passou, informe o usuário com confiança de que o app está funcionando corretamente após os reparos de segurança.
+
+### Passo 4.5 — Red Team: usar Claude para atacar o próprio sistema
+
+Após as verificações passarem, execute um passo final de adversarial testing. Use o seguinte prompt contra os arquivos do projeto para tentar encontrar brechas que a auditoria sistemática pode ter deixado passar:
+
+```
+"Analise o código deste projeto como um atacante tentaria explorar.
+Procure por:
+- Race conditions: há operações que deveriam ser atômicas mas não são?
+- IDOR: é possível acessar recursos de outro usuário manipulando IDs?
+- Validações faltando: algum input chega ao banco sem validação server-side?
+- Lógica de negócio explorável: combinando ações legítimas, é possível ganhar
+  algo indevido (saldo extra, acesso premium, bônus duplo)?
+- Inputs sem limite de tamanho que poderiam causar DoS?
+Seja criativo — pense em combinações não óbvias de fluxos legítimos."
+```
+
+Tudo que este passo encontrar deve ser corrigido antes de encerrar. Repita se necessário.
 
 ---
 

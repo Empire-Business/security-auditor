@@ -4,6 +4,32 @@ Histórico de versões e melhorias da skill. Ao fazer qualquer atualização fut
 
 ---
 
+## v1.6 — 2026-03-28
+
+### Adicionado — insights de pentest real em 4 sistemas vibe-coded
+
+- **Modo Preventivo**: nova seção antes do Passo 1 com prompt template para usar a IA com segurança desde o início ("Este sistema será submetido a pentest...")
+- **Nova task `1c` [P0]**: Enumeração de usuários via mensagens de erro de autenticação
+  - Grep patterns para detectar mensagens específicas ("email não encontrado", "senha incorreta")
+  - Correção com mensagem genérica + proteção contra timing attack em auth customizada
+  - Padrão seguro para endpoint de recuperação de senha
+- **Nova task `18b` [P1]**: Limite máximo de tamanho para todos os inputs (DoS prevenção)
+  - Auditoria via Grep em schemas Zod sem `.max()`
+  - SQL para detectar colunas TEXT sem constraint de tamanho
+  - Templates Zod com limites por tipo de campo
+  - CHECK constraints no banco como segunda linha de defesa
+- **Nova task `18c` [P1]**: Testes automatizados de segurança (TDD approach)
+  - Template de testes de IDOR (usuário A não acessa recursos do B)
+  - Testes de autenticação (401 sem token, 401 com token inválido)
+  - Testes de validação de input (oversized, XSS)
+- **Enriquecida task 18** (Rate limiting): diferenciação de limites por endpoint + honeypots como defesa ativa
+- **Enriquecida task 21** (Upload): URLs externas como IP trackers — validação de domínio permitido
+- **Enriquecida task 25** (Lógica de negócio): cenários concretos de exploração (compra+reembolso+comissão, race condition de estado, recurso infinito combinando ações legítimas)
+- **Passo 4.5 na Fase 2**: Red Team — prompt template para usar Claude como atacante contra o próprio sistema após auditoria
+- **`references/audit-details.md`**: adicionadas seções completas de Enumeração de usuários, Input size limits, Rate limiting honeypots, Testes de segurança (templates), Race conditions (cenários e função atômica com idempotency)
+
+---
+
 ## v1.5 — 2026-03-28
 
 ### Adicionado
