@@ -215,3 +215,14 @@ Após as correções, a skill (com autorização do usuário) executa:
 ## Contribuição
 
 Este repositório é mantido pela [Empire Business](https://github.com/Empire-Business). Pull requests e issues são bem-vindos.
+
+---
+
+## Licença
+
+MIT License — [ver LICENSE](./LICENSE).
+
+> **Aviso importante:** esta skill realiza análises de segurança via IA. O autor não garante
+> que todas as vulnerabilidades serão detectadas e não se responsabiliza por falhas de segurança,
+> vazamentos de dados ou incidentes em apps auditados com ela. Auditorias geradas por IA não
+> substituem revisão por profissional de segurança qualificado. Leia o [LICENSE](./LICENSE) completo.
