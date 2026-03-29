@@ -1,0 +1,8 @@
+interface:
+  display_name: "Security Auditor"
+  short_description: "Full security audit + auto-fix for React/Supabase apps"
+  brand_color: "#00FF88"
+  default_prompt: "Use the security-auditor skill to audit and fix security issues in this project."
+
+policy:
+  allow_implicit_invocation: true

@@ -27,15 +27,23 @@ Quando acionada, esta skill transforma o Claude em um **auditor de segurança s�
 claude skill install https://github.com/Empire-Business/security-auditor
 ```
 
-### Opção 2 — Manual
+### Opção 2 — Manual (Claude Code)
 
 ```bash
-# Clonar na pasta de skills do Claude Code
 git clone https://github.com/Empire-Business/security-auditor \
   ~/.claude/skills/security-auditor
 ```
 
 > **Requisito**: Claude Code CLI instalado. Veja [docs.anthropic.com/claude-code](https://docs.anthropic.com/en/docs/claude-code).
+
+### Opção 3 — OpenAI Codex
+
+```bash
+git clone https://github.com/Empire-Business/security-auditor \
+  ~/.codex/skills/security-auditor
+```
+
+A skill aparece automaticamente na lista de skills do Codex.
 
 ---
 
