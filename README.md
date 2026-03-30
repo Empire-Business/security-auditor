@@ -2,7 +2,7 @@
 
 **Auditoria de segurança completa + correção automática** para apps React + TypeScript + Supabase + Vercel.
 
-> Versão atual: **v1.6** | Insights extraídos de pentests reais em sistemas vibe-coded.
+> Versão atual: **v1.7** | Insights de pentests reais + pesquisa completa de CVEs e melhores práticas 2024/2025.
 
 ---
 
@@ -47,6 +47,20 @@ A skill aparece automaticamente na lista de skills do Codex.
 
 ---
 
+## Como atualizar
+
+Para baixar a versão mais recente, basta dizer ao Claude:
+
+```
+"atualiza a skill de segurança"
+```
+
+ou variações: `"update security-auditor"`, `"tem update da skill?"`, `"instala a nova versão"`.
+
+O Claude executa `git pull origin main` e te mostra o que mudou.
+
+---
+
 ## Como usar
 
 Dentro de qualquer projeto, simplesmente diga ao Claude:
@@ -74,37 +88,46 @@ A skill é acionada automaticamente por essas frases.
 |---|-----------|
 | 1 | Segredos & Variáveis de Ambiente |
 | 1b | service_role — remover e migrar para Access Tokens temporários |
-| 1c | **Enumeração de usuários via mensagens de erro** *(novo v1.6)* |
+| 1c | Enumeração de usuários via mensagens de erro *(v1.6)* |
 | 2 | Git & .gitignore (segredos commitados) |
 | 3 | Rotas privadas & autenticação |
 | 3b | getSession() vs getUser() + CVE-2025-29927 |
+| 3c | **Server Actions / Route Handlers como endpoints públicos** *(novo v1.7)* |
 | 4 | Supabase RLS — tabelas sem proteção |
 | 5 | Supabase Policies permissivas (USING true, IDOR) |
-| 6 | Dependências com CVE crítico |
+| 6 | Dependências com CVE crítico (tabela expandida v1.7) |
 
 ### P1 — Alto (corrija esta semana)
 | # | Categoria |
 |---|-----------|
-| 5b | RLS performance — (SELECT auth.uid()) e índices |
+| 5b | RLS performance — (SELECT auth.uid()), índices e TO authenticated |
 | 7 | Supabase Storage Buckets |
 | 8 | Functions SECURITY DEFINER |
 | 9 | Views que bypassam RLS |
 | 10 | SSRF via pg_net |
 | 11 | JWT — validação e ataques avançados |
-| 12 | MFA — bypass e implementação correta |
+| 11b | **JWT algorithm lock — ES256/JWKS vs HS256** *(novo v1.7)* |
+| 12 | MFA — bypass + RESTRICTIVE policy pattern |
 | 13 | Gerenciamento de sessão & logout |
+| 13b | **Session fixation — rotação de session ID** *(novo v1.7)* |
 | 14 | IDs sequenciais & IDOR |
 | 15 | Sanitização de retornos de API (over-fetching) |
 | 16 | Criptografia de dados sensíveis |
 | 17 | CORS & Security Headers |
+| 17b | **Cross-Origin Isolation — COEP, COOP, CORP** *(novo v1.7)* |
 | 18 | Rate limiting & proteção anti-brute-force + honeypots |
-| 18b | **Input size limits — prevenção de DoS** *(novo v1.6)* |
-| 18c | **Testes automatizados de segurança (TDD)** *(novo v1.6)* |
+| 18b | Input size limits — prevenção de DoS *(v1.6)* |
+| 18c | Testes automatizados de segurança (TDD) *(v1.6)* |
 | 19 | SQL Injection, XSS & Prototype Pollution |
+| 19b | **ReDoS — regex com quantificadores aninhados** *(novo v1.7)* |
 | 20 | Supabase Realtime & subscriptions |
 | 20b | Lógica sensível exposta no frontend |
 | 20c | .or() PostgREST injection |
 | 20d | Realtime canais privados + RLS |
+| 20e | **Zod .strict() para mass assignment + noUncheckedIndexedAccess** *(novo v1.7)* |
+| 20f | **Data Access Layer + server-only + React Taint APIs** *(novo v1.7)* |
+| 20g | **CSRF em Route Handlers** *(novo v1.7)* |
+| 20h | **Open Redirect — validar redirectTo e next params** *(novo v1.7)* |
 
 ### P2 — Médio (próximo sprint)
 | # | Categoria |
@@ -186,6 +209,12 @@ Após as correções, a skill (com autorização do usuário) executa:
 ---
 
 ## Changelog
+
+### v1.7 — 2026-03-28
+- Comando de auto-update integrado: `"atualiza a skill"` → `git pull origin main` + changelog
+- 9 novas tasks P0/P1: Server Actions como endpoints públicos, JWT algorithm lock, session fixation, Cross-Origin Isolation, ReDoS, Zod `.strict()`, DAL + server-only + Taint APIs, CSRF Route Handlers, Open Redirect
+- Tabela de CVEs expandida: CVE-2024-34351, CVE-2024-46982, CVE-2024-56332, GHSA-3529, jsonwebtoken < 9.0.0
+- MFA RESTRICTIVE policy pattern + RLS `TO authenticated` audit
 
 ### v1.6 — 2026-03-28
 - Modo Preventivo com prompt template para vibe-coding seguro

@@ -4,6 +4,7 @@ description: |
   Auditoria de segurança completa E correção automática para apps React + TypeScript + Supabase + Vercel.
   Use esta skill SEMPRE que o usuário pedir para auditar segurança, checar vulnerabilidades, corrigir problemas de segurança, revisar RLS, verificar headers, ou qualquer tarefa de security review no projeto.
   Trigger phrases: "audita segurança", "verifica segurança", "checa vulnerabilidades", "revisa RLS", "security audit", "tem algum problema de segurança", "está seguro meu app", "corrija problemas de segurança", "security check", "auditoria completa".
+  Auto-update triggers: "atualiza a skill", "update security-auditor", "baixa nova versão da skill", "instala update da skill", "atualiza o auditor de segurança". Quando acionado por esses triggers, execute APENAS o comando de atualização descrito no final deste arquivo, não inicie uma auditoria.
   Esta skill cria AUTOMATICAMENTE um conjunto de tasks para diagnosticar e corrigir cada categoria de segurança — sem precisar de instrução adicional do usuário.
 ---
 
@@ -60,6 +61,7 @@ P0 — CRÍTICO (corrija hoje):
   2. [P0] Auditar e corrigir: Git & .gitignore (segredos commitados)
   3. [P0] Auditar e corrigir: Rotas privadas & autenticação
   3b. [P0] Auditar e corrigir: getSession() vs getUser() + CVE-2025-29927 middleware bypass
+  3c. [P0] Auditar e corrigir: Server Actions e Route Handlers como endpoints públicos — re-autenticação obrigatória
   4. [P0] Auditar e corrigir: Supabase RLS — tabelas sem proteção
   5. [P0] Auditar e corrigir: Supabase Policies permissivas (USING true, IDOR)
   5b. [P1] Auditar e corrigir: RLS performance — (SELECT auth.uid()) e índices obrigatórios
@@ -71,20 +73,28 @@ P1 — ALTO (corrija esta semana):
   9. [P1] Auditar e corrigir: Supabase Views que bypassam RLS
  10. [P1] Auditar e corrigir: SSRF via pg_net / extensão HTTP
  11. [P1] Auditar e corrigir: JWT — validação e ataques avançados
+ 11b. [P1] Auditar e corrigir: JWT algorithm lock — ES256/JWKS vs HS256 + algorithm confusion
  12. [P1] Auditar e corrigir: MFA — bypass e implementação correta
  13. [P1] Auditar e corrigir: Gerenciamento de sessão & logout
+ 13b. [P1] Auditar e corrigir: Session fixation — rotação de session ID pós-login e pós-sudo
  14. [P1] Auditar e corrigir: IDs sequenciais & IDOR
  15. [P1] Auditar e corrigir: Sanitização de retornos de API (over-fetching)
  16. [P1] Auditar e corrigir: Criptografia de dados sensíveis
  17. [P1] Auditar e corrigir: CORS & Security Headers (vercel.json)
+ 17b. [P1] Auditar e corrigir: Cross-Origin Isolation headers — COEP, COOP, CORP
  18. [P1] Auditar e corrigir: Rate limiting & proteção anti-brute-force
  18b. [P1] Auditar e corrigir: Limite máximo de tamanho para todos os inputs (DoS prevenção)
  18c. [P1] Auditar e corrigir: Testes automatizados de segurança (gerar suite TDD)
  19. [P1] Auditar e corrigir: Injeção SQL, XSS & Prototype Pollution
+ 19b. [P1] Auditar e corrigir: ReDoS — regex com quantificadores aninhados em validações server-side
  20. [P1] Auditar e corrigir: Supabase Realtime & subscriptions
  20b. [P1] Auditar e corrigir: Arquitetura cliente-servidor — lógica sensível exposta no frontend
  20c. [P1] Auditar e corrigir: .or() PostgREST injection — interpolação de input no método .or()
  20d. [P1] Auditar e corrigir: Realtime canais privados + RLS na realtime.messages
+ 20e. [P1] Auditar e corrigir: Zod .strict() para mass assignment + noUncheckedIndexedAccess no tsconfig
+ 20f. [P1] Auditar e corrigir: Data Access Layer + server-only package + React Taint APIs
+ 20g. [P1] Auditar e corrigir: CSRF em Route Handlers — verificar origin header em mutations
+ 20h. [P1] Auditar e corrigir: Open Redirect — validar redirectTo e next params
 
 P2 — MÉDIO (próximo sprint):
  21. [P2] Auditar e corrigir: Upload de arquivos — validação MIME & tamanho
@@ -210,6 +220,35 @@ A IA frequentemente gera mensagens de erro úteis para o desenvolvedor — mas q
 - **Verificar**: se existe `middleware.ts` no Next.js ou equivalente no Vite com React Router
 - **Correção**: adicionar guard de autenticação. Em Next.js App Router: verificar `cookies()` + `supabase.auth.getUser()` no server component ou middleware.
 
+#### 3c. Server Actions e Route Handlers como endpoints públicos [P0]
+O middleware do Next.js protege páginas — mas Server Actions e Route Handlers são endpoints HTTP independentes. Um usuário mal-intencionado pode chamá-los diretamente, bypassando completamente o middleware.
+
+- **Procure**: arquivos com `'use server'` sem `auth.getUser()` no mesmo escopo:
+  ```bash
+  grep -rn "'use server'" app/ src/ --include="*.ts" --include="*.tsx" -l
+  # Para cada arquivo encontrado, verificar se chama auth.getUser()
+  grep -rn "auth.getUser\|getUser()" app/ src/ --include="*.ts" --include="*.tsx"
+  ```
+- **Procure**: Route Handlers com mutações sem auth check:
+  ```bash
+  grep -rn "export.*POST\|export.*PUT\|export.*DELETE\|export.*PATCH" app/ --include="route.ts"
+  ```
+- **Correção** — cada Server Action e Route Handler deve verificar auth independentemente:
+  ```typescript
+  // ✅ Pattern obrigatório em cada Server Action
+  'use server'
+  import { createClient } from '@/lib/supabase/server'
+
+  export async function sensitiveAction(formData: FormData) {
+    const supabase = createClient()
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error || !user) throw new Error('Unauthorized')
+    // lógica só executa após verificar auth
+  }
+  ```
+- **Risco**: um atacante pode descobrir os nomes das Server Actions via source maps e chamá-las diretamente com `fetch('/path?_action=xxx')`
+- Para padrões completos, veja `references/audit-details.md` → seção "Server Actions como endpoints públicos"
+
 #### 3b. getSession() vs getUser() + CVE-2025-29927 middleware bypass
 Dois erros frequentes e independentes que juntos podem anular toda a proteção de rotas.
 
@@ -259,11 +298,21 @@ Dois erros frequentes e independentes que juntos podem anular toda a proteção 
 
 #### 6. Dependências vulneráveis
 - **Executar**: `npm audit --audit-level=moderate`
-- **Atenção especial**:
-  - React 19.0.0–19.2.3: CVE-2025-55182 (RCE crítico) → atualizar para ≥19.2.4
-  - Next.js < 14.2.x: vulnerabilidades conhecidas
-  - react-router < 7.5.2: DoS e XSS armazenado
+- **CVEs críticos a verificar**:
+
+| CVE / ID | Pacote | CVSS | Descrição | Correção |
+|----------|--------|------|-----------|---------|
+| CVE-2025-55182 | react 19.0.0–19.2.3 | 10.0 | RCE via RSC payload malformado | `npm i react@latest react-dom@latest` |
+| CVE-2025-29927 | next < 14.2.25 ou < 15.2.3 | 9.1 | Middleware bypass via `x-middleware-subrequest` | Atualizar Next.js |
+| CVE-2024-56332 | next < 14.2.21 | 9.1 | RCE via Server-Side Request Forgery em RSC | Atualizar Next.js |
+| CVE-2024-34351 | next < 14.1.1 | 7.5 | SSRF via Host header em Route Handlers | Atualizar Next.js |
+| CVE-2024-46982 | next < 14.2.10 | 7.5 | Cache poisoning via crafted response | Atualizar Next.js |
+| GHSA-3529 | GoTrue (self-hosted) | alto | Email link poisoning — URLs em emails de auth manipuláveis | Atualizar GoTrue; não aplicável ao Supabase cloud |
+| jsonwebtoken < 9.0 | jsonwebtoken | alto | Algorithm confusion — aceita `alg: none` | `npm i jsonwebtoken@latest` |
+| react-router < 7.5.2 | react-router | alto | DoS e XSS armazenado | `npm i react-router@latest` |
+
 - **Correção**: `npm audit fix` para patches automáticos; updates manuais para breaking changes
+- **Nota GHSA-3529**: só relevante para instâncias self-hosted do Supabase Auth (GoTrue). No Supabase cloud, já está corrigido.
 
 ---
 
@@ -286,6 +335,17 @@ WHERE schemaname = 'public'
 ```
 
 **Correção**: substituir `auth.uid()` por `(SELECT auth.uid())` em todas as policies encontradas.
+
+**Cláusula `TO authenticated` obrigatória:**
+Policies sem `TO` se aplicam a todos os roles, incluindo `anon`. Verificar se todas as policies têm o role correto:
+```sql
+-- Verificar policies sem cláusula TO (se aplicam a anon também):
+SELECT tablename, policyname, roles
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND (roles = '{}' OR roles IS NULL OR roles::text = '{=}');
+-- Resultado vazio é OK se esperado, mas policies de dados de usuário devem ter TO authenticated
+```
 
 **Índices nas colunas de políticas:**
 Toda coluna usada em `USING` ou `WITH CHECK` de uma política RLS precisa de índice. Sem isso, cada query faz full table scan filtrado por RLS.
@@ -378,23 +438,65 @@ Para padrões multi-tenant completos e event trigger de auto-RLS, consulte `refe
 - **Correto**: usar `auth.jwt()->>'app_metadata'->>'role'` para claims de role
 - **Procure**: Edge Functions que não chamam `supabase.auth.getUser()` para validar token
 
+#### 11b. JWT algorithm lock — ES256/JWKS vs HS256
+O Supabase usa HS256 por padrão para assinar JWTs, mas ES256 (assimétrico) é mais robusto: a chave privada fica apenas no servidor Auth, enquanto verificadores usam apenas a chave pública — eliminando riscos de vazamento da secret de assinatura.
+
+- **Verificar algoritmo no Dashboard**: Project Settings → API → JWT Settings → Algorithm
+- **Para projetos de alta segurança**: trocar de HS256 para ES256 (requer Supabase Pro)
+- **Verificar** se o projeto usa o pacote `jsonwebtoken` diretamente:
+  ```bash
+  grep -rn "jwt.verify\|jwt.decode\|jsonwebtoken" src/ app/ --include="*.ts"
+  ```
+  - `jsonwebtoken < 9.0.0`: vulnerável a algorithm confusion (CVE registrado) — aceita `alg: none`
+  - **Correção**: `npm install jsonwebtoken@latest`
+- **Nunca faça `jwt.decode()` sem `jwt.verify()`** — decode não verifica a assinatura
+- Para self-hosted Supabase: verificar JWKS endpoint (`/auth/v1/.well-known/jwks.json`) e rotação de chaves
+- Para detalhes, veja `references/audit-details.md` → seção "JWT algorithm lock"
+
 #### 12. MFA bypass
 - **SQL para verificar policies que deveriam exigir MFA**:
   ```sql
   SELECT policyname, qual FROM pg_policies
   WHERE schemaname = 'public' AND qual NOT ILIKE '%aal2%';
   ```
-- **Para tabelas sensíveis**, adicionar verificação AAL:
+- **Para tabelas sensíveis**, adicionar verificação AAL com `AS RESTRICTIVE` (a política RESTRICTIVE é AND com todas as outras — não pode ser bypassada por outras policies PERMISSIVE):
   ```sql
-  CREATE POLICY "require_mfa_for_sensitive" ON tabela_sensivel
-    FOR SELECT TO authenticated
-    USING ((auth.jwt()->>'aal') = 'aal2' AND auth.uid() = user_id);
+  -- RESTRICTIVE: aplica em cima de todas as outras policies (lógica AND)
+  CREATE POLICY "enforce_mfa" ON tabela_sensivel
+    AS RESTRICTIVE FOR ALL TO authenticated
+    USING ((auth.jwt()->>'aal') = 'aal2');
+
+  -- PERMISSIVE: política normal de propriedade (lógica OR com outras PERMISSIVE)
+  CREATE POLICY "users_own_data" ON tabela_sensivel
+    FOR ALL TO authenticated
+    USING ((SELECT auth.uid()) = user_id)
+    WITH CHECK ((SELECT auth.uid()) = user_id);
   ```
+  A combinação garante que o usuário precisa de MFA **E** ser dono do recurso.
 
 #### 13. Sessão & logout
 - **Procure**: `localStorage.setItem` com tokens — preferir cookies HttpOnly
 - **Verificar**: fluxo de logout chama `supabase.auth.signOut()` e não apenas limpa localStorage
 - **Procure**: falta de logout automático por inatividade em apps com dados financeiros/saúde
+
+#### 13b. Session fixation — rotação de session ID pós-login
+Session fixation ocorre quando um atacante conhece o session ID antes do login (ex: via XSS ou sniffing) e depois usa essa sessão já autenticada. A defesa é rotacionar o session ID imediatamente após qualquer elevação de privilégio.
+
+- **Procure**: fluxos de auth customizada que não chamam `refreshSession()` após login:
+  ```bash
+  grep -rn "signInWithPassword\|signUp\|signInWithOtp" src/ app/ --include="*.ts" --include="*.tsx"
+  ```
+- **Correção**: após login bem-sucedido ou após qualquer "sudo" (re-confirmação de senha para operações críticas):
+  ```typescript
+  // Após signIn bem-sucedido em auth customizada
+  const { data: signInData } = await supabase.auth.signInWithPassword({ email, password })
+  if (signInData.session) {
+    // Rotacionar session ID — invalida tokens antigos
+    await supabase.auth.refreshSession()
+  }
+  ```
+- O Supabase Auth gerenciado faz isso automaticamente para fluxos nativos. O risco é maior em auth customizada (Edge Functions) ou em fluxos "sudo" que reconfirmam credenciais sem trocar o token
+- **Verificar**: operações críticas (troca de email, senha, delete de conta) exigem reconfirmação de senha antes de executar?
 
 #### 14. IDs sequenciais & IDOR
 - **SQL**:
@@ -447,6 +549,20 @@ Para padrões multi-tenant completos e event trigger de auto-RLS, consulte `refe
   }
   ```
 - **CORS em Edge Functions**: `Access-Control-Allow-Origin: *` → substituir pelo domínio específico
+
+#### 17b. Cross-Origin Isolation headers
+Headers Cross-Origin protegem contra ataques Spectre (side-channel via SharedArrayBuffer), XS-Leaks e timing attacks cross-origin. Especialmente relevante para apps que processam dados sensíveis.
+
+- **Procure**: `vercel.json` ou `next.config.*` — os três headers devem estar presentes
+- **Adicionar ao vercel.json** (para apps que precisam de isolamento completo):
+  ```json
+  { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" },
+  { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+  { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" }
+  ```
+- **Nota**: COEP `require-corp` pode quebrar recursos externos (CDNs, imagens, iframes de terceiros). Se houver recursos cross-origin necessários, use `credentialless` em vez de `require-corp`, ou adicione `crossorigin="anonymous"` nos recursos afetados.
+- **Verificar COOP em apps com OAuth**: `same-origin` pode quebrar popups OAuth (Google, GitHub). Nesses casos, usar `same-origin-allow-popups`.
+- Para lista completa de Security Headers, veja `references/infrastructure.md` → seção "CSP"
 
 #### 18. Rate limiting
 - **Procure**: endpoints de login, signup, password reset sem rate limiting
@@ -529,6 +645,32 @@ Se o projeto tem uma suíte de testes, verifique se há cobertura para cenários
   import DOMPurify from 'dompurify';
   <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userContent) }} />
   ```
+
+#### 19b. ReDoS — regex com quantificadores aninhados
+Regular Expression Denial of Service ocorre quando uma regex com backtracking catastrófico é avaliada contra um input longo — o tempo de processamento cresce exponencialmente. Um atacante envia 10KB de input cuidadosamente construído e trava a thread Node.js por segundos.
+
+- **Procure**: regex com quantificadores aninhados em código server-side:
+  ```bash
+  grep -rn "\.test(\|\.match(\|\.replace(" src/ app/ --include="*.ts" | grep -v "//\|test\."
+  ```
+  Padrões vulneráveis a buscar:
+  - `/(a+)+/` — quantificador dentro de grupo com quantificador
+  - `/([a-z]+)*$/` — grupo repetível no final sem âncora
+  - `/(.*)*$/` — qualquer nesting de `.*` com `*`
+
+- **Correção**: usar Zod para validações em vez de regex manual:
+  ```typescript
+  // ❌ Regex vulnerável — DoS com input: "aaaaaaaaaaaaaaaaaaaaaa!"
+  const emailRegex = /^([a-zA-Z0-9])+([a-zA-Z0-9\._-])*@([a-zA-Z0-9_-])+([a-zA-Z0-9\._-]+)+$/
+
+  // ✅ Delegar para Zod (usa regex linear internamente)
+  const schema = z.object({
+    email: z.string().email().max(254),
+    slug: z.string().regex(/^[a-z0-9-]{1,100}$/)  // quantificadores com limite explícito
+  })
+  ```
+- **Regra**: qualquer regex server-side deve ter limites explícitos (`{1,100}`, não `+` ou `*` sozinhos) ou usar Zod
+- O limite de tamanho do input (task 18b) é a primeira linha de defesa — um input de 254 chars máximo limita muito o impacto de ReDoS
 
 #### 20. Realtime & subscriptions
 - **Procure**: `supabase.from('tabela').on('*', callback)` sem `.eq('user_id', userId)`
@@ -627,6 +769,107 @@ supabase.channel('chat-room-123', { config: { private: true } }).on(...)
 ```
 
 Para políticas completas de Realtime, consulte `references/audit-details.md` → seção "Realtime avançado".
+
+#### 20e. Zod `.strict()` para mass assignment + `noUncheckedIndexedAccess`
+Dois problemas independentes que a IA frequentemente ignora na geração de código.
+
+**Mass assignment via Zod sem `.strict()`:**
+- **Procure**: schemas Zod sem `.strict()` em Server Actions e Route Handlers que passam dados diretamente para o banco:
+  ```bash
+  grep -rn "z\.object({" src/ app/ --include="*.ts" --include="*.tsx" | grep -v "\.strict()"
+  ```
+- **Risco**: um usuário pode enviar `{ name: "João", role: "admin" }` e o campo `role` vai silenciosamente para o `INSERT` se não for explicitamente bloqueado
+- **Correção**: adicionar `.strict()` em todos os schemas que processam input do usuário:
+  ```typescript
+  // ❌ Aceita campos extras silenciosamente
+  const schema = z.object({ name: z.string(), email: z.string().email() })
+
+  // ✅ Rejeita qualquer campo não declarado com erro de validação
+  const schema = z.object({ name: z.string(), email: z.string().email() }).strict()
+  ```
+
+**`noUncheckedIndexedAccess` no tsconfig:**
+- **Verificar**: `tsconfig.json` tem `"noUncheckedIndexedAccess": true`?
+- **Risco**: `data[0].field` pode ser `undefined` se o array estiver vazio — TypeScript sem essa flag não avisa, gerando crashes em runtime
+- **Correção**: adicionar ao `tsconfig.json`:
+  ```json
+  { "compilerOptions": { "noUncheckedIndexedAccess": true } }
+  ```
+  Após adicionar, o TypeScript vai apontar todos os locais que precisam de `?? fallback` — corrija-os.
+
+#### 20f. Data Access Layer + `server-only` + React Taint APIs
+Separação de responsabilidades no nível de módulo — garante que código de acesso a banco nunca vaze para o bundle do browser.
+
+- **Verificar**: existe uma pasta `src/lib/data-access/` ou `src/dal/` com funções de banco separadas de componentes?
+- **`server-only` package**: adicionar em arquivos que acessam o banco:
+  ```typescript
+  // src/lib/data-access/users.ts
+  import 'server-only'  // ← erro em build-time se importado no cliente
+  import { createClient } from '@/lib/supabase/server'
+
+  export async function getUserById(id: string) {
+    const supabase = createClient()
+    const { data } = await supabase.from('users').select('id, name, email').eq('id', id).single()
+    return data
+  }
+  ```
+  Se `server-only` não estiver instalado: `npm install server-only`
+
+- **React Taint APIs** (React 19+ / Next.js 14+): marca objetos que nunca devem ser serializados para o cliente:
+  ```typescript
+  import { experimental_taintObjectReference, experimental_taintUniqueValue } from 'react'
+
+  // Marcar objeto inteiro como "nunca enviar ao cliente"
+  experimental_taintObjectReference('Não passar credenciais ao cliente', userWithPassword)
+
+  // Marcar valor específico (tokens, chaves)
+  experimental_taintUniqueValue('Não expor token de sessão', cache, sessionToken)
+  ```
+- **Verificar se ativo**: `next.config.ts` tem `experimental: { taint: true }`?
+- Para padrões completos, veja `references/audit-details.md` → seção "Data Access Layer"
+
+#### 20g. CSRF em Route Handlers
+Route Handlers POST/PUT/DELETE sem verificação de origem são vulneráveis a Cross-Site Request Forgery — um site malicioso pode fazer o browser do usuário autenticado disparar requests para sua API.
+
+- **Procure**: Route Handlers com mutações:
+  ```bash
+  grep -rn "export.*POST\|export.*PUT\|export.*DELETE\|export.*PATCH" app/ --include="route.ts" -l
+  ```
+- **Para cada arquivo encontrado**, verificar se há validação de `origin` ou `referer`:
+  ```typescript
+  // ✅ Verificar origin em mutations
+  export async function POST(req: Request) {
+    const origin = req.headers.get('origin')
+    const host = req.headers.get('host')
+    if (!origin || !origin.includes(host ?? '')) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    // ...
+  }
+  ```
+- **Nota**: Server Actions do Next.js têm proteção CSRF built-in desde Next.js 14. O risco é maior em Route Handlers criados manualmente.
+- **Alternativa moderna**: usar `SameSite=Strict` nos cookies de session (Supabase Auth já faz isso)
+
+#### 20h. Open Redirect — validar parâmetros de redirecionamento
+Parâmetros como `?next=`, `?redirect=`, `?returnTo=` são vetores clássicos de phishing — um atacante envia `https://seuapp.com/login?next=https://phishing.com` e após o login, o usuário é redirecionado para o site malicioso.
+
+- **Procure**: redirecionamentos com parâmetros da URL:
+  ```bash
+  grep -rn "redirect(\|router\.push(\|window\.location" src/ app/ --include="*.ts" --include="*.tsx" | grep -i "searchParams\|params\|query\|req\."
+  ```
+- **Correção**: sempre validar que o destino é um path relativo ou domínio autorizado:
+  ```typescript
+  // ❌ Redireciona para qualquer URL sem validação
+  const next = searchParams.get('next') ?? '/'
+  redirect(next)
+
+  // ✅ Só aceita paths relativos (não URLs absolutas)
+  const rawNext = searchParams.get('next') ?? '/'
+  // Rejeita URLs absolutas: http://, https://, // (protocol-relative)
+  const safePath = /^\/[^/\\]/.test(rawNext) ? rawNext : '/'
+  redirect(safePath)
+  ```
+- **Verificar**: Supabase Auth `redirectTo` em `signInWithOAuth` — usar `process.env.NEXT_PUBLIC_APP_URL` como base, nunca valor vindo do cliente
 
 ---
 
@@ -1096,3 +1339,28 @@ Sempre que esta skill for atualizada (nova versão, nova task, nova categoria), 
 - Versão atual no topo
 - Nova entrada no Changelog
 - Novas linhas na tabela de cobertura (se houver novas tasks)
+
+---
+
+## Comando de atualização — baixar nova versão do GitHub
+
+**Acionado por**: "atualiza a skill", "update security-auditor", "baixa nova versão da skill", "instala update da skill", "atualiza o auditor de segurança", "tem update da skill?", "quero a versão mais recente da skill"
+
+Quando o usuário pedir atualização desta skill, **NÃO inicie uma auditoria**. Execute apenas:
+
+```bash
+cd ~/.claude/skills/security-auditor && git pull origin main
+```
+
+Após o pull:
+1. Leia as primeiras linhas do `CHANGELOG.md` para ver o que mudou na versão mais recente
+2. Informe o usuário:
+   - A versão instalada anteriormente
+   - A versão instalada agora
+   - As principais novidades (resumo do CHANGELOG)
+3. Se o pull falhar (sem rede, conflitos, etc.), informe o erro e sugira:
+   ```bash
+   # Re-instalação limpa (se git pull falhar)
+   rm -rf ~/.claude/skills/security-auditor
+   git clone https://github.com/Empire-Business/security-auditor ~/.claude/skills/security-auditor
+   ```

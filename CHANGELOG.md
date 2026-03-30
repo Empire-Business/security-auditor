@@ -4,6 +4,27 @@ Histórico de versões e melhorias da skill. Ao fazer qualquer atualização fut
 
 ---
 
+## v1.7 — 2026-03-28
+
+### Adicionado — pesquisa web completa sobre segurança Supabase + TypeScript 2024/2025
+
+- **Comando de auto-update do GitHub**: nova seção no final do SKILL.md — usuário pode dizer "atualiza a skill" e o Claude executa `git pull origin main` + mostra changelog
+- **Nova task `3c` [P0]**: Server Actions e Route Handlers como endpoints públicos — verificar que cada um re-autentica independente do middleware; grep por `'use server'` sem `auth.getUser()`
+- **Nova task `11b` [P1]**: JWT algorithm lock — auditar ES256/JWKS vs HS256; verificar `jsonwebtoken < 9.0.0`; tabela de CVEs relacionados
+- **Nova task `13b` [P1]**: Session fixation — rotação de session ID após login e elevação de privilégio com `auth.refreshSession()`
+- **Nova task `17b` [P1]**: Cross-Origin Isolation headers (COEP + COOP + CORP) — proteção contra Spectre, XS-Leaks e timing attacks
+- **Nova task `19b` [P1]**: ReDoS prevention — grep por regex com quantificadores aninhados (`(a+)+`, `([a-z]+)*`); correção via Zod + limites explícitos
+- **Nova task `20e` [P1]**: Zod `.strict()` para mass assignment prevention + `noUncheckedIndexedAccess` no `tsconfig.json`
+- **Nova task `20f` [P1]**: Data Access Layer (DAL) + `server-only` package + React Taint APIs (`experimental_taintObjectReference`)
+- **Nova task `20g` [P1]**: CSRF em Route Handlers — verificar `origin` header em POST/PUT/DELETE
+- **Nova task `20h` [P1]**: Open Redirect — validar `redirectTo`, `next`, `returnTo` params contra allowlist de paths relativos
+- **Enriquecida task `#6` CVE**: tabela expandida com CVE-2024-34351 (SSRF), CVE-2024-46982 (cache poisoning), CVE-2024-56332 (RCE via RSC), GHSA-3529 (GoTrue email link poisoning self-hosted), jsonwebtoken < 9.0.0
+- **Enriquecida task `#12` MFA**: adicionado padrão `AS RESTRICTIVE` explícito para policies de MFA — garante que nenhuma outra policy PERMISSIVE pode bypassar o requisito de MFA
+- **Enriquecida task `#5b` RLS performance**: adicionada verificação da cláusula `TO authenticated` explícita em todas as policies
+- **Triggers de auto-update** adicionados ao frontmatter `description` do SKILL.md
+
+---
+
 ## v1.6 — 2026-03-28
 
 ### Adicionado — insights de pentest real em 4 sistemas vibe-coded
