@@ -1,9 +1,9 @@
 ---
 name: security-auditor
 description: |
-  Auditoria de segurança completa E correção automática para apps React + TypeScript + Supabase + Vercel.
+  Auditoria de segurança completa E correção automática para apps React + TypeScript + Supabase + Vercel, com checkup ampliado de LGPD, privacidade por design e guardrails modernos.
   Use esta skill SEMPRE que o usuário pedir para auditar segurança, checar vulnerabilidades, corrigir problemas de segurança, revisar RLS, verificar headers, ou qualquer tarefa de security review no projeto.
-  Trigger phrases: "audita segurança", "verifica segurança", "checa vulnerabilidades", "revisa RLS", "security audit", "tem algum problema de segurança", "está seguro meu app", "corrija problemas de segurança", "security check", "auditoria completa".
+  Trigger phrases: "audita segurança", "verifica segurança", "checa vulnerabilidades", "revisa RLS", "security audit", "tem algum problema de segurança", "está seguro meu app", "corrija problemas de segurança", "security check", "auditoria completa", "audita LGPD", "verifica privacidade", "checkup de segurança".
   Auto-update triggers: "atualiza a skill", "update security-auditor", "baixa nova versão da skill", "instala update da skill", "atualiza o auditor de segurança". Quando acionado por esses triggers, execute APENAS o comando de atualização descrito no final deste arquivo, não inicie uma auditoria.
   Esta skill cria AUTOMATICAMENTE um conjunto de tasks para diagnosticar e corrigir cada categoria de segurança — sem precisar de instrução adicional do usuário.
 ---
@@ -24,10 +24,22 @@ Tudo que roda no navegador do usuário é público. Qualquer pessoa pode abrir o
 
 Tenha essa mentalidade de "zero trust no cliente" durante toda a auditoria.
 
+## Guardrails desta skill — comportamento seguro do auditor
+Esta skill executa ações reais no projeto do usuário. Por isso, ela mesma deve seguir princípios de segurança:
+
+- **Nunca execute comandos destrutivos sem confirmação**: se uma correção envolver deletar dados, revogar chaves ou alterar configurações de produção, pare e pergunte ao usuário
+- **Não modifique segredos reais**: se encontrar `.env` com valores, NÃO os reescreva ou mova — apenas oriente o usuário a fazer isso manualmente
+- **Proteja dados pessoais durante a auditoria**: não copie e-mails, CPFs ou outros PII para o relatório; anonimize ou referencie genericamente
+- **Fail-safe**: se não tiver certeza sobre uma correção, registre como "ação manual recomendada" em vez de aplicar algo que possa quebrar o app
+- **Transparência**: explique brevemente cada correção antes de aplicá-la; o usuário deve entender o que mudou
+- **Verificação**: após cada correção, confirme que o problema foi resolvido e que não introduziu regressões
+- **Sem alterações em CI/CD sem aviso**: workflows de GitHub Actions podem afetar deploys — proponha, não altere silenciosamente
+
 ## Modo Preventivo — se o usuário ainda está construindo o app
 
-Se o usuário pediu a auditoria **antes** de codificar (ou no início do projeto), compartilhe este prompt template que ele pode usar com a IA para construir com segurança desde o início:
+Se o usuário pediu a auditoria **antes** de codificar (ou no início do projeto), compartilhe estes prompt templates que ele pode usar com a IA para construir com segurança e privacidade desde o início:
 
+### Template 1 — Segurança técnica
 ```
 "Este sistema será submetido a um pentest profissional.
 Aplique defesa em profundidade — cada camada deve ser
@@ -39,6 +51,19 @@ Regras obrigatórias:
 - Transações financeiras e mudanças de estado crítico usam operações atômicas
 - Somente usuários autorizados acessam recursos específicos (verificar IDOR)
 - Limite máximo de tamanho em todos os campos de input"
+```
+
+### Template 2 — LGPD e privacidade por design
+```
+"Este app processará dados pessoais de usuários brasileiros e deve estar em conformidade com a LGPD desde o primeiro commit.
+Aplique privacidade por design e por padrão:
+- Colete apenas dados estritamente necessários (minimização)
+- Obtenha e registre consentimento livre, específico e informado para cada finalidade
+- Permita ao usuário acessar, corrigir, excluir e exportar seus dados (art. 18, LGPD)
+- Implemente eliminação automática após o fim da finalidade ou pedido do titular
+- Não armazene dados sensíveis sem necessidade e sem medidas técnicas extras
+- Não envie PII para analytics, error trackers, logs ou third-parties sem anonimização/consentimento
+- Prepare uma rotina de resposta a incidentes e notificação à ANPD"
 ```
 
 A maior alavanca de segurança está no prompt — não no código. Uma instrução clara antes de começar evita reescritas custosas depois.
@@ -58,10 +83,12 @@ P0 — CRÍTICO (corrija hoje):
   1. [P0] Auditar e corrigir: Segredos & Variáveis de Ambiente
   1b. [P0] Auditar e corrigir: service_role — remover do projeto e migrar para Access Tokens temporários (7 dias)
   1c. [P0] Auditar e corrigir: Enumeração de usuários via mensagens de erro de autenticação
+  1d. [P0] Auditar e corrigir: API keys e segredos de terceiros hardcoded no frontend
   2. [P0] Auditar e corrigir: Git & .gitignore (segredos commitados)
   3. [P0] Auditar e corrigir: Rotas privadas & autenticação
   3b. [P0] Auditar e corrigir: getSession() vs getUser() + CVE-2025-29927 middleware bypass
   3c. [P0] Auditar e corrigir: Server Actions e Route Handlers como endpoints públicos — re-autenticação obrigatória
+  3d. [P0] Auditar e corrigir: Brute force protection — account lockout + CAPTCHA/Attack Protection no Supabase Auth
   4. [P0] Auditar e corrigir: Supabase RLS — tabelas sem proteção
   5. [P0] Auditar e corrigir: Supabase Policies permissivas (USING true, IDOR)
   5b. [P1] Auditar e corrigir: RLS performance — (SELECT auth.uid()) e índices obrigatórios
@@ -95,17 +122,22 @@ P1 — ALTO (corrija esta semana):
  20f. [P1] Auditar e corrigir: Data Access Layer + server-only package + React Taint APIs
  20g. [P1] Auditar e corrigir: CSRF em Route Handlers — verificar origin header em mutations
  20h. [P1] Auditar e corrigir: Open Redirect — validar redirectTo e next params
+ 20i. [P1] Auditar e corrigir: Password hashing seguro — bcrypt/Argon2id em auth customizada
+ 20j. [P1] Auditar e corrigir: Error handling seguro — não expor stack traces, fail-safe defaults
 
 P2 — MÉDIO (próximo sprint):
  21. [P2] Auditar e corrigir: Upload de arquivos — validação MIME & tamanho
  22. [P2] Auditar e corrigir: CSP & Subresource Integrity (supply chain)
+ 22b. [P2] Auditar e corrigir: Supply chain security — lockfile, npm ci, verificação de integridade
  23. [P2] Auditar e corrigir: console.log em produção & source maps
  24. [P2] Auditar e corrigir: Supabase Vault & rotação de chaves
  25. [P2] Auditar e corrigir: Lógica de negócio & race conditions
- 26. [P2] Auditar e corrigir: LGPD/GDPR — direito ao esquecimento e consentimento
+ 26. [P2] Auditar e corrigir: LGPD/GDPR — direitos do titular, consentimento, retenção, DPO, DPIA e notificação de incidentes
  27. [P2] Auditar e corrigir: Logging, monitoramento & alertas de segurança
  27b. [P2] Auditar e corrigir: TypeScript types do Supabase e eliminação de `any`
  27c. [P2] Auditar e corrigir: Schema exposure — schema private + permissões desnecessárias de anon
+ 27d. [P2] Auditar e corrigir: PII detection & data classification — mapear e proteger dados pessoais
+ 27e. [P2] Auditar e corrigir: Backup, disaster recovery & RTO/RPO
  28. [FINAL] Gerar relatório completo em `security-report/audit-YYYY-MM-DD.md` e proteger no .gitignore
 ```
 
@@ -207,6 +239,21 @@ A IA frequentemente gera mensagens de erro úteis para o desenvolvedor — mas q
 - **Também verificar**: endpoints de recuperação de senha — não revelar se o e-mail está cadastrado. Retornar sempre "Se esse e-mail estiver cadastrado, você receberá um link em breve."
 - Para padrões detalhados, veja `references/audit-details.md` → seção "Enumeração de usuários"
 
+#### 1d. API keys e segredos de terceiros hardcoded no frontend
+Além da `SUPABASE_SERVICE_ROLE_KEY`, qualquer chave de API de terceiros (OpenAI, Stripe, Google Maps, SendGrid, etc.) que apareça em código client-side pode ser extraída do bundle JavaScript e usada por atacantes — mesmo que seja uma chave "pública".
+
+- **Procure**: strings hardcoded em arquivos `.ts/.tsx` fora de server-only:
+  ```bash
+  grep -rnE "(sk-[a-zA-Z0-9]{20,}|pk_live_[a-zA-Z0-9]{20,}|AIza[0-9A-Za-z_-]{35}|SG\.[a-zA-Z0-9_-]{22,})" \
+    src/ app/ --include="*.ts" --include="*.tsx"
+  ```
+- **Risco**: uso indevido de quotas, exfiltração de dados, custos inesperados e vazamento de dados dos usuários
+- **Correção**:
+  - Mover chamadas a APIs de terceiros para Edge Functions / Server Actions
+  - Se uma chave realmente precisa estar no frontend (ex: Google Maps), restrinja domínios no dashboard do provedor e rotacione periodicamente
+  - Nunca commitar valores reais — usar `.env.example` sem valores
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Segredos & Variáveis de Ambiente"
+
 #### 2. Git & .gitignore
 - **Procure**: `.gitignore` na raiz
 - **Deve conter**: `.env`, `.env.local`, `.env.*.local`, `node_modules`, `.next`, `dist`, `build`, `*.log`, `*.pem`, `*.key`, `*.sqlite`, `security-report/`
@@ -267,6 +314,27 @@ Dois erros frequentes e independentes que juntos podem anular toda a proteção 
 - **Corrija**: atualizar Next.js + garantir que cada Route Handler e Server Action faz sua própria verificação de auth independente do middleware
 - Para os padrões de código, consulte `references/audit-details.md` → seção "getSession() vs getUser()"
 
+#### 3d. Brute force protection — account lockout + CAPTCHA/Attack Protection
+O Supabase Auth possui rate limits padrão, mas eles são genéricos. Apps em produção precisam de proteção explícita contra brute force em login, signup e recuperação de senha.
+
+- **Verificar no Dashboard**: Auth → Attack Protection → habilitar CAPTCHA (hCaptcha/Turnstile)
+- **Verificar rate limits customizados**: Auth → Rate Limits
+  - Signup: máximo 4/hora por IP
+  - Login: máximo 10/hora por IP (ou mais restritivo)
+  - Password recovery: máximo 3/hora
+- **Se houver auth customizada**, verificar account lockout após N tentativas falhas:
+  ```sql
+  -- Tabela de tentativas falhas
+  CREATE TABLE IF NOT EXISTS public.auth_attempts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT NOT NULL,
+    ip TEXT,
+    attempted_at TIMESTAMPTZ DEFAULT now()
+  );
+  ```
+- **Correção**: implementar lockout temporário (15-30 min) após 5 tentativas falhas, ou usar Upstash Ratelimit por e-mail/IP
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Rate limiting"
+
 #### 4. Supabase RLS
 - **SQL para auditar**:
   ```sql
@@ -302,7 +370,12 @@ Dois erros frequentes e independentes que juntos podem anular toda a proteção 
 
 | CVE / ID | Pacote | CVSS | Descrição | Correção |
 |----------|--------|------|-----------|---------|
-| CVE-2025-55182 | react 19.0.0–19.2.3 | 10.0 | RCE via RSC payload malformado | `npm i react@latest react-dom@latest` |
+| CVE-2025-55182 | react 19.0.0–19.2.3 | 10.0 | RCE via RSC payload malformado (React2Shell) | `npm i react@latest react-dom@latest` |
+| CVE-2025-66478 | next < 15.1.9 ou < 16.0.7 | 10.0 | RCE via deserialização insegura de payload RSC (herdado do React) | Atualizar Next.js |
+| CVE-2025-55183 | react / next | 8.5 | Exposição de código-fonte via RSC | Atualizar React/Next.js |
+| CVE-2025-55184 | react / next | 7.5 | DoS via payload RSC malformado | Atualizar React/Next.js |
+| CVE-2025-67779 | react / next | 7.5 | Expansão da classe DoS do CVE-2025-55184 | Atualizar React/Next.js |
+| CVE-2025-48757 | apps Supabase (padrão Lovable) | 10.0 | Exposição total de dados por RLS desabilitado/incorreto | Habilitar RLS em todas as tabelas com dados de usuário |
 | CVE-2025-29927 | next < 14.2.25 ou < 15.2.3 | 9.1 | Middleware bypass via `x-middleware-subrequest` | Atualizar Next.js |
 | CVE-2024-56332 | next < 14.2.21 | 9.1 | RCE via Server-Side Request Forgery em RSC | Atualizar Next.js |
 | CVE-2024-34351 | next < 14.1.1 | 7.5 | SSRF via Host header em Route Handlers | Atualizar Next.js |
@@ -871,6 +944,45 @@ Parâmetros como `?next=`, `?redirect=`, `?returnTo=` são vetores clássicos de
   ```
 - **Verificar**: Supabase Auth `redirectTo` em `signInWithOAuth` — usar `process.env.NEXT_PUBLIC_APP_URL` como base, nunca valor vindo do cliente
 
+#### 20i. Password hashing seguro — em auth customizada
+Se o projeto não usa Supabase Auth e implementa autenticação própria, o hashing de senhas é o ponto mais crítico. Senhas em texto plano, MD5, SHA-1 ou SHA-256 sem salt são inaceitáveis.
+
+- **Procure**:
+  ```bash
+  grep -rnE "(md5|sha1|sha256|bcrypt|argon2|pbkdf2|hashPassword|compare)" \
+    src/ app/ --include="*.ts" --include="*.tsx"
+  ```
+- **Regra**: preferir **Argon2id** (OWASP 2023 recommendation) ou **bcrypt** com custo ≥ 12. Nunca usar MD5/SHA-1/SHA-256 para senhas.
+- **Correção**:
+  ```typescript
+  import { hash, verify } from 'argon2'
+  const passwordHash = await hash(password)
+  const isValid = await verify(passwordHash, inputPassword)
+  ```
+- **Sempre** usar salt automático do algoritmo — nunca salt fixo
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Password hashing"
+
+#### 20j. Error handling seguro — fail-safe e não exposição de detalhes
+Aplicações que "falham aberto" (fail-open) ou expõem stack traces, nomes de tabelas e estrutura interna em mensagens de erro dão informação valiosa a atacantes. OWASP 2025 incluiu "Mishandling of Exceptional Conditions" no Top 10.
+
+- **Procure**: envio de `error.stack` ou objetos de erro completos para o cliente:
+  ```bash
+  grep -rn "error\.stack\|error\.message\|JSON\.stringify(error\|console\.error(error" \
+    src/ app/ --include="*.ts" --include="*.tsx"
+  ```
+- **Regra de ouro**: em produção, retorne mensagens genéricas ao cliente e logue detalhes apenas no servidor:
+  ```typescript
+  // ❌ Expor detalhes internos
+  return Response.json({ error: err.message, stack: err.stack }, { status: 500 })
+
+  // ✅ Genérico para o cliente, detalhado no log
+  console.error('[UNEXPECTED_ERROR]', err)
+  return Response.json({ error: 'Internal server error' }, { status: 500 })
+  ```
+- **Fail-safe**: se a verificação de auth falhar (banco indisponível, JWT inválido), o padrão deve ser **negar** o acesso, não permitir
+- **Verificar**: handlers que fazem `if (user) { permitir }` sem `else { negar }` explícito
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Error handling seguro"
+
 ---
 
 ### P2 — Segurança média
@@ -899,6 +1011,24 @@ Parâmetros como `?next=`, `?redirect=`, `?returnTo=` são vetores clássicos de
 - **Procure**: `<script src="https://...">` sem atributo `integrity` no HTML/layout
 - **Procure em next.config.ts**: `experimental: { sri: { algorithm: 'sha256' } }`
 - **Correção**: adicionar SRI hashes ou bundlar dependências localmente (npm install)
+
+#### 22b. Supply chain security — lockfile, npm ci e verificação de integridade
+OWASP Top 10 2025 elevou "Software Supply Chain Failures" para A03. Apps modernos dependem de centenas de pacotes npm — um pacote comprometido ou um lockfile desatualizado pode introduzir backdoors e vulnerabilidades conhecidas.
+
+- **Verificar**: `package-lock.json` ou `yarn.lock`/`pnpm-lock.yaml` está commitado?
+- **Verificar**: CI/CD usa `npm ci` em vez de `npm install`? (`npm install` pode atualizar versões sem querer)
+- **Verificar**: configuração do `.npmrc` para não instalar pacotes sem assinatura:
+  ```ini
+  # .npmrc
+  engine-strict=true
+  package-lock=true
+  ```
+- **Procure**: scripts `postinstall` suspeitos em dependências:
+  ```bash
+  grep -rn "postinstall" node_modules/*/package.json 2>/dev/null | head -20
+  ```
+- **Correção**: usar `npm audit --production` no CI, pinar versões no `package.json` e manter lockfile atualizado
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Supply chain security"
 
 #### 23. console.log & source maps
 - **Executar**: `grep -r "console\." src/ --include="*.ts" --include="*.tsx" | grep -v "//"`
@@ -962,10 +1092,76 @@ A IA erra mais nesta categoria do que em qualquer outra. Fluxos de negócio comp
   ```
 - Para padrões detalhados, veja `references/audit-details.md` → seção "Race conditions"
 
-#### 26. LGPD/GDPR
-- **Procure**: funcionalidade de "deletar minha conta" — o delete remove todos os dados ou apenas desativa?
-- **Procure**: ferramentas de analytics recebendo PII (nome, email, CPF em query strings)
-- **Verificar**: Sentry/error trackers configurados para não capturar dados pessoais
+#### 26. LGPD/GDPR — privacidade por design e direitos do titular
+A LGPD (Lei Geral de Proteção de Dados) estabelece obrigações técnicas e organizacionais que vão muito além de "ter um botão de deletar conta". Esta task cobre os principais requisitos aplicáveis a apps React + Supabase.
+
+**Direitos do titular (art. 18, LGPD) — checklist de implementação:**
+
+| Direito | O que verificar no app | Implementação típica |
+|---------|----------------------|---------------------|
+| Confirmação e acesso | Existe endpoint/página onde o usuário vê seus dados? | `/account/data` com exportação JSON |
+| Correção | Usuário pode editar dados pessoais? | Formulário de perfil com validação |
+| Anonimização, bloqueio ou eliminação | Existe rotina de hard delete ou anonimização? | Edge Function + SQL de deleção em cascata |
+| Portabilidade | Usuário pode exportar dados em formato estruturado? | Download JSON/CSV dos dados pessoais |
+| Informação sobre compartilhamento | Registro de quais terceiros recebem dados | Tabela `data_sharing_log` |
+| Revogação de consentimento | Consentimentos são registrados e revogáveis? | Tabela `consents` com `revoked_at` |
+| Oposição | Usuário pode se opor a tratamentos baseados em legítimo interesse? | Configurações de privacidade |
+| Revisão de decisões automatizadas | Algoritmos afetam interesses do usuário? | Sistema de appeal/revisão humana |
+
+**Princípios e guardrails técnicos:**
+
+- **Minimização**: colete apenas dados estritamente necessários. Verifique tabelas por colunas como `cpf`, `rg`, `phone`, `address` que não são essenciais ao negócio
+- **Consentimento**: deve ser livre, específico, informado e revogável. Evite consentimentos pré-marcados ou bundled (um único checkbox para várias finalidades)
+- **Finalidade**: cada dado coletado deve ter finalidade clara documentada. Não reutilize dados para finalidades não informadas
+- **Retenção**: implemente eliminação automática após o fim da finalidade:
+  ```sql
+  -- Exemplo: deletar logs antigos automaticamente
+  DELETE FROM public.activity_logs WHERE created_at < NOW() - INTERVAL '90 days';
+  ```
+- **Notificação de incidentes**: prepare rotina para notificar ANPD e titulares em caso de vazamento (art. 46, §3º)
+- **DPO (Encarregado)**: verifique se o app processa dados em larga escala ou sensíveis — se sim, indique a necessidade de nomear um DPO
+- **DPIA/RIPD**: para tratamentos de alto risco (dados sensíveis, profiling, monitoramento massivo), documente uma avaliação de impacto à proteção de dados
+
+**PII em serviços externos:**
+
+- **Procure**: envio de e-mail, nome, CPF, user ID para analytics, ads, chat widgets, error trackers:
+  ```bash
+  grep -rn "gtag\|fbq\|amplitude\|mixpanel\|sentry\|hotjar\|intercom" \
+    src/ app/ --include="*.ts" --include="*.tsx"
+  ```
+- **Regra**: nunca enviar PII para third-parties sem anonimização ou base legal. User IDs devem ser hashes, não UUIDs reais
+- **Sentry**: configure `beforeSend` para remover PII:
+  ```typescript
+  Sentry.init({
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    beforeSend(event) {
+      if (event.user) {
+        delete event.user.email
+        delete event.user.ip_address
+      }
+      return event
+    }
+  })
+  ```
+
+**Deleção de conta (hard delete vs soft delete):**
+
+- Soft delete (`deleted_at`) **não** atende ao direito de eliminação da LGPD se os dados ainda puderem ser reidentificados
+- Implemente hard delete ou anonimização irreversível:
+  ```sql
+  CREATE OR REPLACE FUNCTION delete_user_data(p_user_id UUID)
+  RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+  BEGIN
+    DELETE FROM public.profiles WHERE user_id = p_user_id;
+    DELETE FROM public.orders WHERE user_id = p_user_id;
+    DELETE FROM public.user_uploads WHERE user_id = p_user_id;
+    -- Deletar arquivos do Storage via Edge Function
+    -- Deletar conta de auth via service_role em Edge Function separada
+  END;
+  $$;
+  ```
+
+- Para checklist completo e templates de política de privacidade, veja `references/audit-details.md` → seção "LGPD" e `references/infrastructure.md` → seção "LGPD/GDPR checklist"
 
 #### 27. Logging & monitoramento
 - **Verificar**: Supabase Dashboard → Logs — há queries suspeitas de scan?
@@ -1051,6 +1247,35 @@ TypeScript não bloqueia hackers, mas bloqueia você de cometer erros que criam 
   const post: Tables<'posts'> | null = data?.[0] ?? null
   ```
 
+#### 27d. PII detection & data classification — mapear e proteger dados pessoais
+Não é possível proteger o que você não sabe que existe. Apps frequentemente acumulam dados pessoais sem catalogação, aumentando o risco de vazamento e multas regulatórias.
+
+- **Mapear colunas com PII no banco**:
+  ```sql
+  -- Listar colunas suspeitas de conter PII
+  SELECT table_name, column_name, data_type
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND column_name IN ('email', 'cpf', 'phone', 'phone_number', 'address', 'document', 'passport', 'rg', 'birth_date', 'name', 'full_name')
+  ORDER BY table_name, column_name;
+  ```
+- **Classificação de dados**: categorize em `público`, `interno`, `confidencial`, `sensível` (LGPD art. 5º, II). Dados sensíveis (saúde, biometria, convicção religiosa, etc.) exigem medidas técnicas extras
+- **Verificar**: esses dados são realmente necessários? Podem ser anonimizados ou pseudonimizados?
+- **Marcar schemas/tabelas sensíveis**: documente no relatório quais tabelas contêm PII e quais controles existem
+- Para padrões detalhados, veja `references/audit-details.md` → seção "PII detection"
+
+#### 27e. Backup, disaster recovery & RTO/RPO
+Segurança não é apenas prevenir ataques — é também garantir recuperação. A LGPD e boas práticas exigem que você consiga restaurar dados e continuar operando após incidentes.
+
+- **Verificar**: o projeto tem backups automáticos configurados no Supabase Dashboard?
+- **Verificar**: backups são testados periodicamente? (um backup que não restaura é inútil)
+- **Definir RTO/RPO**:
+  - RTO (Recovery Time Objective): tempo máximo aceitável de indisponibilidade
+  - RPO (Recovery Point Objective): quantidade máxima de dados aceitável perder
+- **Backup criptografado**: backups devem estar criptografados em repouso e em trânsito
+- **Cópias fora do ambiente primário**: para dados críticos, considere backup em região/secundária ou exportação criptografada
+- Para padrões detalhados, veja `references/audit-details.md` → seção "Backup e DR"
+
 ---
 
 ## Passo 3: Relatório final (task #28)
@@ -1118,7 +1343,7 @@ O arquivo markdown deve seguir exatamente esta estrutura:
 
 ### Detalhamento por categoria
 
-Para cada uma das 27 categorias auditadas, registre uma entrada:
+Para cada uma das 38 categorias auditadas, registre uma entrada:
 
 ```
 #### [#] [Nome da categoria] — [✅ Seguro | ❌ Vulnerável corrigido | ⚠️ Ação manual | ➖ Não aplicável]
@@ -1172,6 +1397,8 @@ Para cada uma das 27 categorias auditadas, registre uma entrada:
 | Headers & CORS | [nota /10] | [nota /10] | |
 | Frontend (XSS, sanitização) | [nota /10] | [nota /10] | |
 | Infraestrutura (Storage, Functions) | [nota /10] | [nota /10] | |
+| LGPD & Privacidade | [nota /10] | [nota /10] | |
+| Supply Chain & Integridade | [nota /10] | [nota /10] | |
 | **Média geral** | **[X.X/10]** | **[X.X/10]** | |
 
 ---

@@ -4,6 +4,28 @@ Histórico de versões e melhorias da skill. Ao fazer qualquer atualização fut
 
 ---
 
+## v1.8 — 2026-06-17
+
+### Adicionado — LGPD, guardrails e segurança ampliada
+
+- **Nova task `1d` [P0]**: API keys e segredos de terceiros hardcoded no frontend (OpenAI, Stripe, Google Maps, SendGrid)
+- **Nova task `3d` [P0]**: Brute force protection — account lockout + CAPTCHA/Attack Protection no Supabase Auth
+- **Nova task `20i` [P1]**: Password hashing seguro — Argon2id/bcrypt/PBKDF2 em auth customizada; alerta para MD5/SHA-1/SHA-256
+- **Nova task `20j` [P1]**: Error handling seguro — fail-safe defaults, não exposição de stack traces, OWASP A10:2025
+- **Nova task `22b` [P2]**: Supply chain security — lockfile, `npm ci`, verificação de integridade, OWASP A03:2025
+- **Task `26` [P2] totalmente reescrita**: LGPD/GDPR completo — direitos do titular (art. 18), consentimento, finalidade, minimização, retenção, DPO, DPIA, notificação de incidentes, hard delete vs soft delete
+- **Nova task `27d` [P2]**: PII detection & data classification — mapeamento de dados pessoais no banco
+- **Nova task `27e` [P2]**: Backup, disaster recovery & RTO/RPO
+- **Tabela de CVEs expandida**: adicionados CVE-2025-66478, CVE-2025-55183, CVE-2025-55184, CVE-2025-67779 e CVE-2025-48757
+- **Modo Preventivo ampliado**: novo template de LGPD/privacidade por design
+- **Guardrails da própria skill**: seção obrigatória de comportamento seguro do auditor — não executar comandos destrutivos sem confirmação, não modificar segredos reais, proteger PII durante auditoria, fail-safe, transparência
+- **Arquivos de referência atualizados**:
+  - `references/audit-details.md`: novas seções de Password hashing, Error handling, Supply chain, Brute force, LGPD completo, PII detection, Backup e DR
+  - `references/infrastructure.md`: OWASP Top 10 atualizado para 2025, seções de LGPD/GDPR e Supply chain
+- **Triggers ampliados**: adicionados "audita LGPD", "verifica privacidade", "checkup de segurança"
+
+---
+
 ## v1.7 — 2026-03-28
 
 ### Adicionado — pesquisa web completa sobre segurança Supabase + TypeScript 2024/2025

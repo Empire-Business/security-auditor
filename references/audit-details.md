@@ -978,6 +978,252 @@ export async function POST(req: Request) {
 
 ---
 
+### Password hashing seguro
+
+Se o projeto implementa autenticação própria (não usa Supabase Auth), o hashing é o controle mais crítico.
+
+**Algoritmos recomendados (ordem de preferência):**
+
+| Algoritmo | Salt automático | Resistência a GPU/ASIC | Recomendação |
+|-----------|----------------|----------------------|--------------|
+| Argon2id | Sim | Alta | **OWASP 2023 recommendation** |
+| bcrypt | Sim | Média-alta | Custo mínimo 12 |
+| scrypt | Sim | Média | Boa alternativa |
+| PBKDF2 | Sim | Média | Iterações ≥ 600.000 |
+| SHA-256/SHA-512 | Não | Baixa | **Inaceitável para senhas** |
+| MD5/SHA-1 | Não | Muito baixa | **Inaceitável** |
+
+**Exemplo com Argon2 (Node.js):**
+
+```typescript
+import { hash, verify } from 'argon2'
+
+async function register(email: string, password: string) {
+  const passwordHash = await hash(password) // salt automático
+  await db.users.insert({ email, password_hash: passwordHash })
+}
+
+async function login(email: string, password: string) {
+  const user = await db.users.findOne({ email })
+  if (!user) {
+    await verify(DUMMY_HASH, password) // prevenir timing attack
+    return { error: 'Credenciais inválidas' }
+  }
+  const valid = await verify(user.password_hash, password)
+  if (!valid) return { error: 'Credenciais inválidas' }
+  return { user }
+}
+```
+
+**Buscar no projeto:**
+```bash
+grep -rnE "(md5|sha1|sha256|bcrypt|argon2|pbkdf2|hashPassword|compare)" \
+  src/ app/ --include="*.ts" --include="*.tsx"
+```
+
+---
+
+### Error handling seguro — fail-safe e não exposição
+
+OWASP Top 10 2025 introduziu **A10: Mishandling of Exceptional Conditions**. Aplicações devem falhar de forma segura (fail-safe closed) e nunca expor detalhes internos.
+
+**Padrões perigosos:**
+```typescript
+// ❌ Expor stack trace e mensagens internas
+return Response.json({ error: err.message, stack: err.stack }, { status: 500 })
+
+// ❌ Fail-open: se não conseguir verificar auth, permite
+if (user?.role === 'admin') {
+  // ação privilegiada
+}
+// sem else → não-admin passa silenciosamente se user for null
+```
+
+**Padrão seguro:**
+```typescript
+// ✅ Genérico para cliente, detalhado no log
+console.error('[UNEXPECTED_ERROR]', err)
+return Response.json({ error: 'Internal server error' }, { status: 500 })
+
+// ✅ Fail-safe: nega por padrão
+const { data: { user } } = await supabase.auth.getUser()
+if (!user) {
+  return Response.json({ error: 'Unauthorized' }, { status: 401 })
+}
+const isAdmin = user.app_metadata?.role === 'admin'
+if (!isAdmin) {
+  return Response.json({ error: 'Forbidden' }, { status: 403 })
+}
+```
+
+**Verificar:**
+```bash
+grep -rn "error\.stack\|error\.message\|JSON\.stringify(error" \
+  src/ app/ --include="*.ts" --include="*.tsx"
+```
+
+---
+
+### Supply chain security
+
+OWASP Top 10 2025 — **A03: Software Supply Chain Failures**.
+
+**Checklist:**
+- [ ] Lockfile commitado (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`)
+- [ ] CI usa `npm ci` / `yarn install --frozen-lockfile` / `pnpm install --frozen-lockfile`
+- [ ] Versões de dependências pinadas no `package.json` (evitar `^`/`~` para pacotes críticos)
+- [ ] `.npmrc` com `engine-strict=true`
+- [ ] Revisão de scripts `postinstall` suspeitos
+- [ ] Dependabot/Renovate configurado para alertas de segurança
+
+**Verificar postinstall scripts:**
+```bash
+grep -rn "postinstall\|preinstall" node_modules/*/package.json 2>/dev/null | head -20
+```
+
+**GitHub Actions seguro:**
+```yaml
+- name: Install dependencies
+  run: npm ci  # nunca npm install em CI
+
+- name: Audit
+  run: npm audit --audit-level=high --production
+```
+
+---
+
+### Brute force protection e account lockout
+
+Além de rate limiting por IP, proteja contas individuais contra brute force direcionado.
+
+**Com Supabase Auth:**
+- Habilite Attack Protection + CAPTCHA (hCaptcha/Turnstile)
+- Configure rate limits conservadores no Dashboard
+
+**Com auth customizada:**
+```sql
+CREATE TABLE IF NOT EXISTS public.auth_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  ip INET,
+  attempted_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_auth_attempts_email ON public.auth_attempts(email);
+```
+
+```typescript
+async function checkLockout(email: string, ip: string): Promise<boolean> {
+  const { count } = await supabase
+    .from('auth_attempts')
+    .select('*', { count: 'exact', head: true })
+    .eq('email', email)
+    .gt('attempted_at', new Date(Date.now() - 15 * 60 * 1000).toISOString())
+  return (count ?? 0) >= 5
+}
+```
+
+---
+
+### LGPD — checklist técnico completo
+
+**Direitos do titular (art. 18):**
+
+1. **Confirmação e acesso** — endpoint `/api/me/data` retornando todos os dados pessoais
+2. **Correção** — formulário de edição de perfil
+3. **Anonimização, bloqueio ou eliminação** — rotina de hard delete ou anonimização irreversível
+4. **Portabilidade** — exportação em JSON/CSV estruturado
+5. **Informação sobre compartilhamento** — log de terceiros que receberam dados
+6. **Revogação de consentimento** — tabela de consentimentos com `revoked_at`
+7. **Oposição** — configurações de privacidade
+8. **Revisão de decisões automatizadas** — fluxo de appeal humano
+
+**Princípios técnicos:**
+- **Minimização**: revise colunas `cpf`, `rg`, `phone`, `address`, `birth_date`, etc.
+- **Finalidade**: documente por que cada dado é coletado
+- **Retenção**: elimine automaticamente após o prazo necessário
+- **Consentimento**: granular, claro, registrado e revogável
+- **Segurança**: criptografia, RLS, MFA, logs de acesso
+- **Transparência**: política de privacidade acessível e atualizada
+- **Notificação de incidentes**: rotina para ANPD e titulares em até 72h
+
+**Hard delete seguro:**
+```sql
+CREATE OR REPLACE FUNCTION delete_user_data(p_user_id UUID)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  DELETE FROM public.profiles WHERE user_id = p_user_id;
+  DELETE FROM public.orders WHERE user_id = p_user_id;
+  DELETE FROM public.activity_logs WHERE user_id = p_user_id;
+  -- Edge Function separada para deletar arquivos do Storage
+  -- Edge Function separada para deletar auth.users via service_role
+END;
+$$;
+```
+
+**Sentry sem PII:**
+```typescript
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  beforeSend(event) {
+    if (event.user) {
+      event.user = { id: event.user.id } // só mantém ID anonimizado
+    }
+    return event
+  }
+})
+```
+
+---
+
+### PII detection e data classification
+
+**Colunas típicas de PII:**
+- Identificação: `name`, `full_name`, `email`, `cpf`, `rg`, `passport`, `document`
+- Contato: `phone`, `phone_number`, `address`, `zip_code`
+- Biográficos: `birth_date`, `age`, `gender`
+- Financeiros: `card_number`, `bank_account`, `income`
+- Sensíveis (LGPD art. 5º, II): `health`, `biometrics`, `religion`, `political`, `sexual_orientation`
+
+**Query de mapeamento:**
+```sql
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND column_name IN (
+    'email', 'cpf', 'phone', 'phone_number', 'address', 'document',
+    'passport', 'rg', 'birth_date', 'name', 'full_name', 'card_number'
+  )
+ORDER BY table_name, column_name;
+```
+
+**Classificação sugerida:**
+- Público: dados que já são públicos
+- Interno: dados operacionais não pessoais
+- Confidencial: dados pessoais não sensíveis
+- Sensível: dados sensíveis da LGPD
+
+---
+
+### Backup e disaster recovery
+
+**Checklist:**
+- [ ] Backups automáticos habilitados no Supabase Dashboard
+- [ ] Backups testados periodicamente (restore em ambiente isolado)
+- [ ] RTO e RPO documentados
+- [ ] Backups criptografados em repouso e em trânsito
+- [ ] Cópia off-site ou em região secundária para dados críticos
+- [ ] Procedimento documento de recovery
+
+**RTO/RPO exemplo:**
+| Sistema | RTO | RPO |
+|---------|-----|-----|
+| Auth | 1h | 0 (sincrono) |
+| Dados transacionais | 4h | 15 min |
+| Logs/analytics | 24h | 1h |
+
+---
+
 ## Ferramentas complementares {#ferramentas}
 
 | Ferramenta | Uso | Como instalar/acessar |

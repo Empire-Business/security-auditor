@@ -2,7 +2,7 @@
 
 **Auditoria de segurança completa + correção automática** para apps React + TypeScript + Supabase + Vercel.
 
-> Versão atual: **v1.7** | Insights de pentests reais + pesquisa completa de CVEs e melhores práticas 2024/2025.
+> Versão atual: **v1.8** | Checkup ampliado de LGPD/privacidade por design + OWASP Top 10:2025 + guardrails modernos.
 
 ---
 
@@ -81,7 +81,7 @@ A skill é acionada automaticamente por essas frases.
 
 ---
 
-## Cobertura — 32 categorias de auditoria
+## Cobertura — 38 categorias de auditoria
 
 ### P0 — Crítico (corrija hoje)
 | # | Categoria |
@@ -89,10 +89,12 @@ A skill é acionada automaticamente por essas frases.
 | 1 | Segredos & Variáveis de Ambiente |
 | 1b | service_role — remover e migrar para Access Tokens temporários |
 | 1c | Enumeração de usuários via mensagens de erro *(v1.6)* |
+| 1d | API keys e segredos de terceiros hardcoded no frontend *(novo v1.8)* |
 | 2 | Git & .gitignore (segredos commitados) |
 | 3 | Rotas privadas & autenticação |
 | 3b | getSession() vs getUser() + CVE-2025-29927 |
 | 3c | **Server Actions / Route Handlers como endpoints públicos** *(novo v1.7)* |
+| 3d | **Brute force protection + CAPTCHA/Attack Protection** *(novo v1.8)* |
 | 4 | Supabase RLS — tabelas sem proteção |
 | 5 | Supabase Policies permissivas (USING true, IDOR) |
 | 6 | Dependências com CVE crítico (tabela expandida v1.7) |
@@ -128,19 +130,24 @@ A skill é acionada automaticamente por essas frases.
 | 20f | **Data Access Layer + server-only + React Taint APIs** *(novo v1.7)* |
 | 20g | **CSRF em Route Handlers** *(novo v1.7)* |
 | 20h | **Open Redirect — validar redirectTo e next params** *(novo v1.7)* |
+| 20i | **Password hashing seguro — bcrypt/Argon2id** *(novo v1.8)* |
+| 20j | **Error handling seguro — fail-safe, não expor stack traces** *(novo v1.8)* |
 
 ### P2 — Médio (próximo sprint)
 | # | Categoria |
 |---|-----------|
 | 21 | Upload de arquivos — MIME, magic bytes, IP trackers |
 | 22 | CSP & Subresource Integrity |
+| 22b | **Supply chain security — lockfile, npm ci, integridade** *(novo v1.8)* |
 | 23 | console.log em produção & source maps |
 | 24 | Supabase Vault & rotação de chaves |
 | 25 | **Lógica de negócio & race conditions** (cenários reais) |
-| 26 | LGPD/GDPR |
+| 26 | **LGPD/GDPR — direitos do titular, consentimento, retenção, DPO, DPIA** *(ampliado v1.8)* |
 | 27 | Logging, monitoramento & alertas |
 | 27b | TypeScript types do Supabase |
 | 27c | Schema exposure — schema private |
+| 27d | **PII detection & data classification** *(novo v1.8)* |
+| 27e | **Backup, disaster recovery & RTO/RPO** *(novo v1.8)* |
 
 ---
 
