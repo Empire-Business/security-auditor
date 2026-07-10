@@ -13,9 +13,9 @@
 Quando acionada, esta skill transforma o Claude em um **auditor de segurança sênior** que:
 
 1. Cria um plano de trabalho com tasks organizadas por prioridade (P0 → P1 → P2)
-2. Executa cada task no ciclo **AUDITAR → CORRIGIR → VERIFICAR**
-3. Aplica correções diretamente no código (não apenas reporta)
-4. Gera um relatório completo em `security-report/audit-YYYY-MM-DD.md`
+2. Executa cada task no ciclo **AUDITAR → PROPOR → (CORRIGIR só com confirmação) → VERIFICAR**
+3. **Report-only por padrão**: propõe correções e aplica (Edit/Write/SQL) somente após confirmação explícita do usuário, por mudança de risco
+4. Gera um relatório em `security-report/audit-YYYY-MM-DD.md` **e** um veredito machine-readable em `security-report/verdict.json` (contrato que a `omnx-code` lê para o gate de deploy)
 5. Executa verificação de integridade pós-correção (TypeScript, build, lint, testes)
 6. Roda um **Red Team** — usa o próprio Claude para tentar atacar o sistema
 

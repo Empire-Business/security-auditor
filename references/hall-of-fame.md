@@ -34,3 +34,32 @@ Em 2026-07-10, a skill `security-auditor` foi submetida a um **red-team contra s
 
 ## Como o resultado virou código
 Os achados do top 3 viraram o núcleo da v1.9 (ver `CHANGELOG.md`): correção dos exemplos errados, verificação real, Passo 0 de threat model, novos módulos (`references/v19-modules.md`) e Guardrails v2 com supply-chain assinado da própria skill.
+
+---
+
+# Rodada 2 — Red Team da INTEGRAÇÃO omnx-code ⇄ security-auditor (v1.10)
+
+Em 2026-07-10, 4 agentes atacaram a **costura** entre as duas skills (não a auditor por dentro). Veredito convergente: o endurecimento v1.9 era **declarado, não imposto** — o "gate" vivia em checkboxes e o "update assinado" não tinha no que pinnar. A v1.10 incorpora as correções (gate real via `verdict.json` fail-closed, update verify-antes, anti-downgrade de instalações irmãs).
+
+## Método de pontuação
+- P0 = 5, P1 = 3, P2 = 2, P3 = 1; **×2** por achado único, **×1** por compartilhado; bônus por verificação empírica (git/symlink).
+- 1º–2º e 3º–4º ficaram muito próximos; o pódio privilegia achados únicos de maior impacto na integração.
+
+## Pódio
+
+### 🥇 Inspetor de Pipeline
+- **Bypass via agentes externos**: `AGENTS.md` (lido por Lovable/Cursor/Codex) nunca citava a `/security-auditor` nem o gate → push→main→Vercel sem saber do bloqueio.
+- **Fail-open por política** (`omnx-code/SKILL.md`: "não bloqueie, deixe o usuário decidir"); re-teste aberto (o fix já deploya); momentos ausentes (merge em main, rotação de secrets, troca Supabase); mismatch de severidade/status no handoff.
+
+### 🥈 Atacante da Supply-Chain (verificação empírica)
+- **Sombra `~/.agents` (v1.4/v1.7 com RCE cego) sem detecção** — a v1.9 endurecida era contornada se qualquer runtime lesse `~/.agents`.
+- **`git checkout <ref> && git verify-tag … || echo` aplicava ANTES de verificar**; `git tag` vazio e HEAD não assinado → `git pull` com teatro. Path hardcoded + symlink quebrado em `~/.codex`; anti-prompt-injection só do lado da auditor.
+
+### 🥉 Operador Cínico
+- **Colisão de triggers** ("atualiza a skill" / "auditar segurança" sem dono); **self-rewrite em plena execução** (checkout de si mesma como Task 1 e segue sem reload); **single-source-of-truth violada** (checklist da omnx codificava política de segurança). Foi o único a recusar overclaim.
+
+## Menção honrosa
+- **Advogado do Contrato**: mapeou a base estrutural — sem tags, sem schema de saída, sem `version` no frontmatter, semver lexicográfico, e a contradição de auto-fix no corpo da auditor.
+
+## Como o resultado virou código (v1.10)
+`security-report/verdict.json` + gate fail-closed na omnx-code (recusa push/merge sem `gate: PASS`); `version`/`contract_version` nos frontmatters; update `git verify-tag && git checkout` (verificar antes), sem `|| echo`, sem `--ff-only`, com allowlist/SHA e `curl -fsSL`; Passo 0 de varredura de instalações irmãs; gate espelhado no `AGENTS.md`; self-update por último + reload; copy honesta.

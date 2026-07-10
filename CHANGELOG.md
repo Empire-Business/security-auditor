@@ -4,6 +4,27 @@ Histórico de versões e melhorias da skill. Ao fazer qualquer atualização fut
 
 ---
 
+## v1.10 — 2026-07-10
+
+### Contrato de integração + update verificado de verdade (red-team da integração)
+
+Esta versão nasce do segundo red-team, agora sobre a **costura** com a `omnx-code`: o endurecimento v1.9 estava declarado, mas não era imposto nem verificável. Pódio e crédito em `references/hall-of-fame.md` (Rodada 2).
+
+### Adicionado
+- **`security-report/verdict.json` (contrato de gate, machine-readable)**: ao final de toda auditoria, a skill agora grava um JSON com schema fixo (`contract_version`, `p0_open`, `p1_open`, `not_verified_open`, `manual_open`, `fix_applied`, `gate`). Regra fail-closed: `gate = PASS` só se `p0_open == 0` E `p1_open == 0` E `not_verified_open == 0` E `manual_open == 0`. É o artefato que a `omnx-code` lê para bloquear deploy.
+- **Frontmatter estruturado**: `version: "1.10"` e `contract_version: 1` (leitura por máquina, não mais por grep em CHANGELOG).
+- **Allowlist de referência imutável** no fluxo de update (`PINNED_TAG=`/`PINNED_SHA=`), para quando houver release assinado.
+
+### Modificado
+- **Corpo alinhado ao contrato report-only**: títulos de task renomeados de "Auditar e corrigir" para "Auditar e propor" (54 ocorrências); `README.md` agora descreve o ciclo AUDITAR → PROPOR → (CORRIGIR só com confirmação) → VERIFICAR e menciona o `verdict.json`.
+- **Update verificado de verdade**: `git verify-tag <TAG> && git checkout <TAG>` (verificar ANTES de trocar o código); removido o `|| echo` que mascarava falha; `git fetch --tags` padronizado; em conflito, para e pede ao usuário (sem `git pull --ff-only` automático). Sem tag assinada, o fluxo PARE e pede um SHA explícito — nunca deriva "a mais recente", nunca fica em `main`.
+- **Dono do verbo "atualizar"** declarado: este fluxo atualiza só a `security-auditor`; "atualizar tudo" é da `omnx-code`.
+
+### Segurança
+- Fecha o teatro de "auto-update assinado": antes, `git checkout <ref> && git verify-tag … || echo` aplicava o código antes de verificar (e, sem tags assinadas, caía sempre no aviso). Agora verifica antes e aborta sem referência imutável.
+
+---
+
 ## v1.9 — 2026-07-10
 
 ### Endurecimento completo (red-team da própria skill)
