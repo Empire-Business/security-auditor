@@ -4,6 +4,24 @@ Histórico de versões e melhorias da skill. Ao fazer qualquer atualização fut
 
 ---
 
+## Não lançado (edição local, ainda sem tag/versão)
+
+### Modo Pentest — squad de agentes adversariais competitivos (oferecido, opt-in)
+
+Ajuste pedido pelo usuário: ao rodar a verificação de segurança, a skill deve oferecer um pentest multi-agente onde cada agente é "recompensado" por falhas reais encontradas, com framing rigoroso e faminto por achar problemas.
+
+### Adicionado
+- **Nova seção "Oferta de Modo Pentest"** (antes do Passo 0): sempre que um trigger de auditoria dispara, a skill oferece (nunca ativa sozinha) rodar um squad de 3-5 agentes adversariais em paralelo, cada um com uma lente diferente (autorização/IDOR, injeção, lógica de negócio/race conditions, segredos, supply-chain).
+- **Sistema de pontuação com salvaguarda anti-reward-hacking**: pontos só são atribuídos após verificação independente do achado (mesmo padrão de re-teste + re-query já usado na skill); achado não verificado marca "reportado, não confirmado" e vale zero pontos — evita que o incentivo de "recompensa" leve agentes a inventar vulnerabilidades falsas para pontuar. Pontuação por severidade (P0 > P1 > P2), duplicata entre agentes conta uma vez.
+- **Relatório do Modo Pentest**: placar por agente/lente, achados confirmados vs. não confirmados, e o valor incremental (achados que o squad pegou e a auditoria sistemática sozinha não pegaria). Achados confirmados entram na mesma pipeline de correção e gate `verdict.json` já existentes — sem regras de gate diferentes.
+- **Passo 4.5 (Red Team single-agent)** agora referencia o Modo Pentest como a versão ampliada do mesmo adversarial testing.
+- **Trigger phrases** no frontmatter ganham "pentest", "modo pentest", "esquadrão de agentes de segurança".
+
+### Nota
+Esta entrada ainda não foi commitada nem tagueada no repositório `Empire-Business/security-auditor` — é uma edição local. Propagação para outras máquinas/projetos depende do fluxo de update verificado (tag/SHA pinado) já existente na skill.
+
+---
+
 ## v1.10 — 2026-07-10
 
 ### Contrato de integração + update verificado de verdade (red-team da integração)
