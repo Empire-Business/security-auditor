@@ -19,6 +19,7 @@ Esta versão nasce do segundo red-team, agora sobre a **costura** com a `omnx-co
 - **Corpo alinhado ao contrato report-only**: títulos de task renomeados de "Auditar e corrigir" para "Auditar e propor" (54 ocorrências); `README.md` agora descreve o ciclo AUDITAR → PROPOR → (CORRIGIR só com confirmação) → VERIFICAR e menciona o `verdict.json`.
 - **Update verificado de verdade**: `git verify-tag <TAG> && git checkout <TAG>` (verificar ANTES de trocar o código); removido o `|| echo` que mascarava falha; `git fetch --tags` padronizado; em conflito, para e pede ao usuário (sem `git pull --ff-only` automático). Sem tag assinada, o fluxo PARE e pede um SHA explícito — nunca deriva "a mais recente", nunca fica em `main`.
 - **Dono do verbo "atualizar"** declarado: este fluxo atualiza só a `security-auditor`; "atualizar tudo" é da `omnx-code`.
+- **Release carimbado (`v1.10.0`)**: tag anotada publicada; fluxo de update agora usa `PINNED_TAG=v1.10.0` + `PINNED_SHA=41fd0d6...`, validando a tag pelo SHA imutavel (nunca 'tag mais alta', nunca `main`); `git verify-tag` e usado se um dia houver GPG.
 
 ### Segurança
 - Fecha o teatro de "auto-update assinado": antes, `git checkout <ref> && git verify-tag … || echo` aplicava o código antes de verificar (e, sem tags assinadas, caía sempre no aviso). Agora verifica antes e aborta sem referência imutável.
