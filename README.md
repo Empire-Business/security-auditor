@@ -1,8 +1,10 @@
 # Security Auditor — Claude Code Skill
 
-**Auditoria de segurança completa + correção automática** para apps React + TypeScript + Supabase + Vercel.
+**Auditoria de segurança + correção assistida** para apps React + TypeScript + Supabase + Vercel/Next.js **web**.
 
-> Versão atual: **v1.8** | Checkup ampliado de LGPD/privacidade por design + OWASP Top 10:2025 + guardrails modernos.
+> Versão atual: **v1.9** | Verificação real (re-teste + re-query no banco + scanners), threat model antes do checklist, cobertura ampliada (IA/LLM, Edge/Deno, ORM, OAuth/OIDC, lógica de borda), Guardrails v2 (anti-prompt-injection, auto-update assinado, auto-fix opt-in).
+>
+> **Escopo e limites:** audita a stack web React/Next.js + Supabase + Vercel. **Não** cobre internals de IA/LLM, mobile/Expo/RN, ORMs com conexão direta fora do supabase-js, posture de CI/CD, nem certifica PCI-DSS/HIPAA/SOC2. O relatório declara essas exclusões. Auditoria de IA não substitui revisão por profissional de segurança.
 
 ---
 
@@ -57,7 +59,7 @@ Para baixar a versão mais recente, basta dizer ao Claude:
 
 ou variações: `"update security-auditor"`, `"tem update da skill?"`, `"instala a nova versão"`.
 
-O Claude executa `git pull origin main` e te mostra o que mudou.
+O Claude busca o diff (`git fetch` + `log`), aplica **por tag/commit verificado** e te mostra o que mudou — nunca `git pull main` cego.
 
 ---
 
@@ -81,7 +83,7 @@ A skill é acionada automaticamente por essas frases.
 
 ---
 
-## Cobertura — 38 categorias de auditoria
+## Cobertura — 38 categorias-base + módulos v1.9
 
 ### P0 — Crítico (corrija hoje)
 | # | Categoria |
@@ -98,6 +100,9 @@ A skill é acionada automaticamente por essas frases.
 | 4 | Supabase RLS — tabelas sem proteção |
 | 5 | Supabase Policies permissivas (USING true, IDOR) |
 | 6 | Dependências com CVE crítico (tabela expandida v1.7) |
+| 6b | **Assinatura de webhook** (Stripe/Svix/GitHub) — antes da idempotência *(novo v1.9)* |
+| 6c | **IA/LLM — prompt injection, tool-calling abuse, RAG cross-tenant, token-DoS** *(novo v1.9)* |
+| 6d | **Edge Functions (Deno) — verify_jwt, --no-check, import map, supply chain** *(novo v1.9)* |
 
 ### P1 — Alto (corrija esta semana)
 | # | Categoria |
@@ -161,7 +166,9 @@ security-auditor/
 └── references/
     ├── audit-details.md        # SQL + código TypeScript para cada categoria
     ├── advanced-rls.md         # Padrões avançados de RLS (multi-tenant, RBAC)
-    └── infrastructure.md       # OWASP Top 10, CSP, Dashboard hardening
+    ├── infrastructure.md       # OWASP Top 10, CSP, Dashboard hardening
+    ├── v19-modules.md          # Módulos v1.9: IA/LLM, Edge/Deno, ORM, OAuth, lógica de borda, CI/CD
+    └── hall-of-fame.md         # Red-team da própria skill: pódio e crédito dos agentes
 ```
 
 ---
@@ -218,7 +225,7 @@ Após as correções, a skill (com autorização do usuário) executa:
 ## Changelog
 
 ### v1.7 — 2026-03-28
-- Comando de auto-update integrado: `"atualiza a skill"` → `git pull origin main` + changelog
+- Comando de auto-update SEGURO: `"atualiza a skill"` → `git fetch` + diff + pin por tag/commit verificado (nunca `git pull main` cego) + changelog
 - 9 novas tasks P0/P1: Server Actions como endpoints públicos, JWT algorithm lock, session fixation, Cross-Origin Isolation, ReDoS, Zod `.strict()`, DAL + server-only + Taint APIs, CSRF Route Handlers, Open Redirect
 - Tabela de CVEs expandida: CVE-2024-34351, CVE-2024-46982, CVE-2024-56332, GHSA-3529, jsonwebtoken < 9.0.0
 - MFA RESTRICTIVE policy pattern + RLS `TO authenticated` audit

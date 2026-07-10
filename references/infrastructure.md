@@ -42,15 +42,18 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'", // Remover 'unsafe-inline' se possível
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
+      // CSP forte = sem 'unsafe-inline'. Use nonce por request (middleware) + 'strict-dynamic'.
+      "script-src 'self' 'nonce-${nonce}' 'strict-dynamic'",
+      "style-src 'self' 'nonce-${nonce}'",
+      "img-src 'self' data: https://*.supabase.co", // allowlist explícita — NUNCA https: genérico
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      "object-src 'none'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
       "upgrade-insecure-requests",
+      // "require-trusted-types-for 'script'", // ativar quando o app estiver pronto
     ].join('; '),
   },
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -121,7 +124,7 @@ Ações manuais obrigatórias no Supabase Dashboard (não automatizáveis via c�
 - [ ] Adicionar CAPTCHA (hCaptcha ou Turnstile): Auth → Settings → CAPTCHA protection
 - [ ] Configurar SMTP customizado: Auth → Settings → Email → SMTP Provider (padrão: 2 emails/hora, absurdamente baixo)
 - [ ] Revisar Rate Limits: Auth → Rate Limits
-- [ ] Desabilitar "Confirm email" se não estiver usando (reduz ataque de enumeração)
+- [ ] Manter "Confirm email" ATIVADO — desligar permite account pre-creation/squatting com e-mail de terceiro. Mitigue enumeração com resposta genérica + rate limit (tasks 1c/3d), não desativando verificação
 
 **Realtime:**
 - [ ] Desabilitar "Allow public access": Realtime → Settings → toggle off
@@ -175,6 +178,13 @@ jobs:
       - run: npm audit --audit-level=high --production
         # --production ignora devDependencies (reduz falsos positivos)
 ```
+
+**Hardening obrigatório (v1.9):**
+- `permissions: contents: read` no topo do workflow (negar write por padrão ao `GITHUB_TOKEN`).
+- **Nunca** use `pull_request_target` com acesso a secrets em código de fork (exfiltra `SUPABASE_SERVICE_ROLE_KEY`/`ACCESS_TOKEN`). Prefira `pull_request` + environments protegidos.
+- Deploy sem secret estático via **OIDC** (`id-token: write`) para Supabase/Vercel.
+- **Pine ações por SHA** (`uses: actions/checkout@<sha>`), não por tag móvel.
+- Habilite **branch protection** + **environment protection rules** e revise artefatos entre jobs.
 
 **Verificar se o arquivo já existe:**
 ```bash
@@ -281,7 +291,7 @@ Antes de coletar qualquer dado pessoal, identifique a base legal:
 - [ ] **Transferência internacional**: SCCs ou país com adequação da ANPD
 - [ ] **DPO**: nomeado se processamento em larga escala ou dados sensíveis
 - [ ] **DPIA/RIPD**: avaliação de impacto para tratamentos de alto risco
-- [ ] **Incidentes**: rotina de resposta e notificação à ANPD em até 72h
+- [ ] **Incidentes**: rotina de resposta e notificação à ANPD em até **3 dias úteis** (6 para agente de pequeno porte) a partir do conhecimento — Res. CD/ANPD 15/2024. ⚠️ Não confundir com os "72h" do GDPR.
 - [ ] **Política de privacidade**: clara, acessível e atualizada
 
 ### Cookies e trackers

@@ -181,17 +181,18 @@ export const config = {
 **Verificação server-side em page.tsx (App Router):**
 ```typescript
 // app/dashboard/page.tsx
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server' // @supabase/ssr (auth-helpers-nextjs está DEPRECADO)
 import { redirect } from 'next/navigation'
 
 export default async function DashboardPage() {
-  const supabase = createServerComponentClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) redirect('/login')
+  const supabase = await createClient()
+  // ✅ getUser() revalida o JWT no Auth server — NUNCA use getSession() aqui
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) redirect('/login')
   // ...
 }
 ```
+> Regra: em qualquer código server-side (page, layout, Route Handler, Server Action), use `auth.getUser()`. `auth.getSession()` lê o cookie sem revalidar e aceita JWT expirado/revogado — é anti-padrão mesmo como exemplo.
 
 ---
 
@@ -338,14 +339,19 @@ CREATE POLICY "require_mfa" ON tabela_financeira
 
 **Verificar AAL no frontend (TypeScript):**
 ```typescript
+// ✅ Use getAuthenticatorAssuranceLevel — NÃO derive AAL de factors.length.
+// user.factors lista fatores CADASTRADOS, não o nível de garantia da sessão atual.
+// (Conta com MFA enrolado mas logada só por senha é AAL1, não AAL2.)
 const checkMFA = async () => {
-  const { data: { session } } = await supabase.auth.getSession()
-  const aal = session?.user?.factors?.length > 0 ? 'aal2' : 'aal1'
-  if (aal !== 'aal2' && requiresMFA) {
+  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (error || !data) return
+  // currentLevel = garantia da sessão agora; nextLevel = após desafio MFA bem-sucedido
+  if (requiresMFA && data.currentLevel !== 'aal2') {
     router.push('/mfa-verify')
   }
 }
 ```
+> Para dados financeiros/sensíveis, combine com a policy server-side `auth.jwt()->>'aal' = 'aal2'` (acima). A checagem no cliente é só UX — a fronteira real é a policy.
 
 ---
 
@@ -414,7 +420,11 @@ const ratelimit = new Ratelimit({
 })
 
 export async function rateLimitMiddleware(request: Request) {
-  const ip = request.headers.get('x-forwarded-for') ?? '127.0.0.1'
+  // ⚠️ NÃO use o x-forwarded-for do cliente (spoofável → bypass do limite e DoS de vítimas).
+  // Na Vercel/Next, prefira o IP da plataforma (ex.: (request as NextRequest).ip) ou o header confiável do proxy.
+  const ip = request.headers.get('x-real-ip')
+    ?? request.headers.get('cf-connecting-ip')
+    ?? '127.0.0.1'
   const { success, limit, reset, remaining } = await ratelimit.limit(`ratelimit_${ip}`)
   if (!success) {
     return new Response(JSON.stringify({ error: 'Too Many Requests' }), {
@@ -461,9 +471,8 @@ const searchRatelimit = new Ratelimit({
 // app/api/admin-backup/route.ts — rota honeypot
 // Qualquer acesso a esta rota é automaticamente suspeito
 export async function GET(request: Request) {
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown'
-  // Log e bloquear o IP no Redis por 24h
-  await redis.set(`honeypot_blocked_${ip}`, true, { ex: 86400 })
+  const ip = request.headers.get('x-real-ip') ?? request.headers.get('cf-connecting-ip') ?? 'unknown'
+  // ⚠️ Não auto-bane por header spoofável — atacante pode fazer você banir IP de vítimas (DoS). Logue e alerte.
   console.warn(`[HONEYPOT] Acesso suspeito de IP: ${ip}`)
   // Retornar resposta plausível para não alertar o atacante
   return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -576,7 +585,11 @@ describe('IDOR Prevention', () => {
     const res = await fetch(`/api/resources/${userBResourceId}`, {
       headers: { Authorization: `Bearer ${userAToken}` }
     })
-    expect(res.status).toBe(403)
+    // RLS NÃO devolve 403: leitura bloqueada retorna 200 com [] / count 0.
+    const body = await res.json().catch(() => null)
+    const leaked = JSON.stringify(body)
+    expect(leaked).not.toContain(userBResourceId)
+    expect(leaked).not.toContain('User B resource')
   })
 
   it('should not allow user A to update user B resource', async () => {
@@ -585,15 +598,24 @@ describe('IDOR Prevention', () => {
       headers: { Authorization: `Bearer ${userAToken}` },
       body: JSON.stringify({ title: 'Hijacked' })
     })
-    expect(res.status).toBe(403)
+    // UPDATE bloqueado por RLS afeta 0 linhas (200, count:0) — confirme lendo de volta
+    const check = await fetch(`/api/resources/${userBResourceId}`, {
+      headers: { Authorization: `Bearer ${userBToken}` }
+    })
+    const after = await check.json()
+    expect(JSON.stringify(after)).not.toContain('Hijacked')
   })
 
   it('should not allow user A to delete user B resource', async () => {
-    const res = await fetch(`/api/resources/${userBResourceId}`, {
+    await fetch(`/api/resources/${userBResourceId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${userAToken}` }
     })
-    expect(res.status).toBe(403)
+    // DELETE bloqueado por RLS afeta 0 linhas — o recurso do B ainda existe
+    const check = await fetch(`/api/resources/${userBResourceId}`, {
+      headers: { Authorization: `Bearer ${userBToken}` }
+    })
+    expect(check.status).toBe(200)
   })
 })
 
@@ -857,7 +879,7 @@ BEGIN
   -- Deletar arquivos do Storage
   -- Deletar via auth.admin em Edge Function separada
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 ```
 
 **ERRADO — soft delete não atende LGPD:**
@@ -895,50 +917,61 @@ if (balance >= amount) {
 // quando o saldo ainda não foi debitado
 ```
 
-**Padrão seguro — operação atômica:**
+**Padrão seguro — operação atômica COM autorização (não confie no chamador):**
 ```sql
--- Tudo em uma única transaction com verificação e ação combinadas
-CREATE OR REPLACE FUNCTION process_purchase(
-  p_buyer_id uuid,
+-- Pré-requisitos OBRIGATÓRIOS (sem eles o snippet falha ou fica inseguro):
+-- ALTER TABLE transactions ADD CONSTRAINT uq_idem UNIQUE (idempotency_key);
+-- REVOKE EXECUTE ON FUNCTION public.process_purchase(uuid,uuid,numeric,text) FROM anon, authenticated;
+-- GRANT EXECUTE ON FUNCTION public.process_purchase(uuid,uuid,numeric,text) TO <server_role>;
+
+CREATE OR REPLACE FUNCTION public.process_purchase(
+  p_buyer_id uuid,           -- ignorado: derivado de auth.uid()
   p_seller_id uuid,
   p_amount numeric,
   p_idempotency_key text
 )
 RETURNS jsonb
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
-  v_balance numeric;
+  v_buyer uuid := auth.uid();  -- comprador é SEMPRE o usuário autenticado
 BEGIN
-  -- Prevenir duplicatas via idempotency key
-  INSERT INTO transactions (idempotency_key, buyer_id, seller_id, amount, status)
-  VALUES (p_idempotency_key, p_buyer_id, p_seller_id, p_amount, 'processing')
+  IF v_buyer IS NULL THEN
+    RETURN jsonb_build_object('status', 'error', 'message', 'Não autenticado');
+  END IF;
+  IF p_amount IS NULL OR p_amount <= 0 THEN
+    RETURN jsonb_build_object('status', 'error', 'message', 'Valor inválido');
+  END IF;
+
+  -- Prevenir duplicatas via idempotency key (exige UNIQUE acima)
+  INSERT INTO public.transactions (idempotency_key, buyer_id, seller_id, amount, status)
+  VALUES (p_idempotency_key, v_buyer, p_seller_id, p_amount, 'processing')
   ON CONFLICT (idempotency_key) DO NOTHING;
 
   IF NOT FOUND THEN
     RETURN jsonb_build_object('status', 'duplicate', 'message', 'Transação já processada');
   END IF;
 
-  -- Debitar e verificar saldo na mesma operação atômica
-  UPDATE wallets
+  -- Debitar e verificar saldo na mesma operação atômica (do comprador autenticado)
+  UPDATE public.wallets
   SET balance = balance - p_amount
-  WHERE user_id = p_buyer_id AND balance >= p_amount;
+  WHERE user_id = v_buyer AND balance >= p_amount;
 
   IF NOT FOUND THEN
-    -- Reverter a transaction marcada como processing
-    DELETE FROM transactions WHERE idempotency_key = p_idempotency_key;
+    DELETE FROM public.transactions WHERE idempotency_key = p_idempotency_key;
     RETURN jsonb_build_object('status', 'error', 'message', 'Saldo insuficiente');
   END IF;
 
-  -- Creditar vendedor
-  UPDATE wallets SET balance = balance + p_amount WHERE user_id = p_seller_id;
-
-  -- Marcar como concluída
-  UPDATE transactions SET status = 'completed' WHERE idempotency_key = p_idempotency_key;
+  UPDATE public.wallets SET balance = balance + p_amount WHERE user_id = p_seller_id;
+  UPDATE public.transactions SET status = 'completed' WHERE idempotency_key = p_idempotency_key;
 
   RETURN jsonb_build_object('status', 'success');
 END;
 $$;
 ```
+> Por quê: sem `SECURITY DEFINER` + `auth.uid()` + `amount > 0` + `REVOKE`, qualquer `authenticated` chamaria `rpc('process_purchase', { buyer: '<vítima>', seller: '<eu>', amount: 99999 })` — e valor negativo viraria auto-crédito. Função financeira nunca é pública.
 
 **Verificar no código:**
 ```bash
@@ -950,31 +983,43 @@ grep -rn "supabase\.from.*update\|supabase\.from.*insert" \
 grep -rn "\.rpc(" src/ app/ --include="*.ts" --include="*.tsx"
 ```
 
-**Idempotency em webhooks (Stripe/pagamentos):**
+**Webhooks — verificar assinatura ANTES da idempotência (P0):**
+
+Idempotência só impede **replay** de um `event_id` já visto — não impede evento **forjado**. Sem verificar assinatura, qualquer um POSTa um `checkout.session.completed` e credita compra/plano sem pagar. Valide primeiro.
+
 ```typescript
-// Edge Function para webhook de pagamento
-const processedEvents = new Set() // ou Redis em produção
+// Stripe — verificação de assinatura com o corpo CRU (raw body)
+import Stripe from 'stripe'
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 export async function POST(req: Request) {
-  const event = await parseWebhook(req)
+  const sig = req.headers.get('stripe-signature')
+  const rawBody = await req.text() // corpo cru, NÃO req.json()
+  let event: Stripe.Event
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET!)
+  } catch {
+    return new Response('Invalid signature', { status: 400 }) // rejeita forjado
+  }
 
-  // Verificar se já processamos este evento
-  const { data: existing } = await supabase
+  // Idempotência ATÔMICA (não check-then-act): UNIQUE(event_id) + ON CONFLICT
+  const { data, error } = await supabase
     .from('processed_webhooks')
-    .select('id')
-    .eq('event_id', event.id)
+    .insert({ event_id: event.id, event_type: event.type })
+    .select()
     .single()
+  // Se já existia (unique violation), outra entrega já processou
+  if (error?.code === '23505') return Response.json({ status: 'already_processed' })
+  if (error) return new Response('retry', { status: 500 })
 
-  if (existing) return Response.json({ status: 'already_processed' })
-
-  // Processar e registrar atomicamente
   await supabase.rpc('process_payment_event', {
-    event_id: event.id,
-    event_type: event.type,
-    payload: event.data
+    event_id: event.id, event_type: event.type, payload: event.data
   })
+  return Response.json({ status: 'ok' })
 }
 ```
+
+Equivalentes: Svix/`standard-webhooks` (`wh.verify(rawBody, headers, secret)`), GitHub (`X-Hub-Signature-256` com HMAC-SHA256 + `crypto.timingSafeEqual`), Supabase Database Webhooks (HMAC no header). Regra: **assinatura → depois** idempotência atômica (`INSERT … ON CONFLICT` com `UNIQUE(event_id)`), nunca `select`→`insert` (TOCTOU) nem `new Set()` em serverless (cada cold start é vazio).
 
 ---
 
@@ -999,7 +1044,12 @@ Se o projeto implementa autenticação própria (não usa Supabase Auth), o hash
 import { hash, verify } from 'argon2'
 
 async function register(email: string, password: string) {
-  const passwordHash = await hash(password) // salt automático
+  const passwordHash = await hash(password, {
+    type: 2,            // argon2id
+    memoryCost: 19456,  // ~19 MiB — mínimo OWASP 2023
+    timeCost: 2,
+    parallelism: 1,
+  }) // salt automático
   await db.users.insert({ email, password_hash: passwordHash })
 }
 
@@ -1145,12 +1195,12 @@ async function checkLockout(email: string, ip: string): Promise<boolean> {
 - **Consentimento**: granular, claro, registrado e revogável
 - **Segurança**: criptografia, RLS, MFA, logs de acesso
 - **Transparência**: política de privacidade acessível e atualizada
-- **Notificação de incidentes**: rotina para ANPD e titulares em até 72h
+- **Notificação de incidentes**: rotina para ANPD e titulares em até **3 dias úteis** (6 para agente de pequeno porte) a partir do conhecimento — Res. CD/ANPD 15/2024. ⚠️ Não confundir com os "72h" do GDPR.
 
 **Hard delete seguro:**
 ```sql
 CREATE OR REPLACE FUNCTION delete_user_data(p_user_id UUID)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   DELETE FROM public.profiles WHERE user_id = p_user_id;
   DELETE FROM public.orders WHERE user_id = p_user_id;
@@ -1259,8 +1309,8 @@ grep -rn "dangerouslySetInnerHTML" src/ --include="*.tsx"
 # Buscar console.log no código de produção
 grep -rn "console\.\(log\|debug\|info\)" src/ --include="*.ts" --include="*.tsx"
 
-# Buscar select * no Supabase
-grep -rn "\.select\(['\"]\\*['\"]" src/ --include="*.ts" --include="*.tsx"
+# Buscar select * no Supabase (ERE; grupo balanceado)
+grep -rnE "\.select\(\s*['\"]\*['\"]" src/ --include="*.ts" --include="*.tsx"
 
 # Buscar localStorage com tokens
 grep -rn "localStorage\." src/ --include="*.ts" --include="*.tsx"

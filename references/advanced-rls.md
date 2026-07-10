@@ -231,8 +231,10 @@ CREATE TABLE public.role_permissions (
 );
 
 -- 3. Hook que injeta o role no JWT
+-- SECURITY DEFINER é OBRIGATÓRIO: sem ele, se user_roles tiver RLS, a função
+-- (executando como supabase_auth_admin) não lê nada → role NULL → todo mundo vira 'member'.
 CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
-RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
   claims jsonb;
   user_role public.app_role;
@@ -241,12 +243,16 @@ BEGIN
   WHERE user_id = (event->>'user_id')::uuid;
 
   claims := event->'claims';
-  claims := jsonb_set(claims, '{user_role}',
+  -- Grava a role DENTRO de app_metadata (lido por getUser() no cliente/servidor).
+  claims := jsonb_set(claims, '{app_metadata,user_role}',
     to_jsonb(COALESCE(user_role, 'member'::app_role)));
   event := jsonb_set(event, '{claims}', claims);
   RETURN event;
 END;
 $$;
+-- Conceda execução ao role do Auth:
+-- GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
+-- GRANT SELECT ON public.user_roles TO supabase_auth_admin;
 
 -- 4. Função de autorização usada nas políticas RLS
 CREATE OR REPLACE FUNCTION public.authorize(requested_permission app_permission)
@@ -270,14 +276,24 @@ CREATE POLICY "Admins deletam canais"
 
 **Habilitar no Dashboard:** Authentication → Hooks → Custom Access Token → selecionar `public.custom_access_token_hook`
 
-**Verificar role no TypeScript:**
+**Onde a role é lida (alinhado com o hook acima):**
+
+- **Em RLS (fronteira real):** `auth.jwt() -> 'app_metadata' ->> 'user_role'` — o claim está no token e é lido pelas policies.
+- **Em TypeScript (servidor/UX):** valide com `getUser()` e leia a role do token. Atenção: `user.app_metadata` vem da coluna `auth.users.app_metadata` e **não** recebe claims do Custom Access Token Hook automaticamente — leia a claim do access token.
+
 ```typescript
-const { data: { user } } = await supabase.auth.getUser()
-const role = (user?.app_metadata?.user_role as string) ?? 'member'
-if (role !== 'admin') {
-  return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
-}
+// Route Handler / Server Action
+const token = req.headers.get('authorization')?.replace('Bearer ', '')
+const { data: { user }, error } = await supabase.auth.getUser(token) // valida o JWT
+if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+// Se o hook persiste a role em auth.users.app_metadata:
+const role = (user.app_metadata?.user_role as string) ?? 'member'
+// Se a role veio só no JWT (claim do hook), decodifique `token` e leia app_metadata.user_role.
+
+if (role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 ```
+> Checagem em TS é early-return/UX; a autorização de verdade fica no RLS via `auth.jwt()`.
 
 ---
 

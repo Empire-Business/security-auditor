@@ -4,6 +4,61 @@ Histórico de versões e melhorias da skill. Ao fazer qualquer atualização fut
 
 ---
 
+## v1.9 — 2026-07-10
+
+### Endurecimento completo (red-team da própria skill)
+
+Esta versão nasce de um exercício de **red-team contra a própria skill** (6 agentes atacantes). O foco foi: parar de ensinar conselho errado, trocar "verificação por grep" por verificação real, fechar o supply-chain da própria skill e ampliar o escopo para as superfícies de 2025. Crédito e pódio em `references/hall-of-fame.md`.
+
+### Corrigido — conselho errado/perigoso (P0/P1)
+- **RPC "seguro" virava roubo de saldo**: `process_purchase`/`deduct_balance_atomic` reescritos com `SECURITY DEFINER`, `p_buyer_id = auth.uid()`, `CHECK (amount > 0)` e `REVOKE EXECUTE FROM anon, authenticated` (valor negativo não vira mais auto-crédito).
+- **Webhook sem assinatura**: verificação (`constructEvent`/`timingSafeEqual`/`svix`) agora é etapa P0 **anterior** à idempotência; exemplo corrigido.
+- **`getSession()` nos próprios exemplos**: substituído por `getUser()` + `@supabase/ssr` em `audit-details.md` (page.tsx, MFA). `auth-helpers-nextjs` marcado como deprecado.
+- **AAL de MFA** derivado de `factors.length` (errado) → `supabase.auth.mfa.getAuthenticatorAssuranceLevel()`.
+- **CSRF** `origin.includes(host)` (bypass por substring) → `new URL(origin).host === host`.
+- **Hook RBAC** sem `SECURITY DEFINER` (virava "todo mundo member") → corrigido; claim gravada em `app_metadata.user_role` e leitura TS alinhada.
+- **CSP teatro**: removido `'unsafe-inline'` de `script-src`/`style-src` (nonce + `'strict-dynamic'`), `img-src` com allowlist, `object-src 'none'`; **removido** o header deprecado `X-XSS-Protection`.
+- **Rate-limit/honeypot** com `x-forwarded-for` spoofável → IP confiável (`request.ip`/cadeia) + chave composta; honeypot não auto-bane por header.
+- **Teste de IDOR** esperava `403` (RLS devolve `200`/vazio) → asserção no corpo (`data.length === 0` / não contém `victimId`).
+- **LGPD**: prazo de notificação à ANPD corrigido de "72h" para **3 dias úteis** (Res. CD/ANPD 15/2024).
+- **Tabela de CVEs** revisada: CVE-2025-66478 (faixas por linha menor 15.0.5/15.1.9/15.2.6/15.3.6/15.4.8/15.5.7/16.0.7), CVE-2025-55182 (pacote correto `react-server-dom-*`), CVE-2024-56332 reclassificado como DoS/DoW. ⚠️ CVEs mudam — re-verificar em fonte primária antes de auditar.
+- Diversos: Argon2 com parâmetros OWASP, `pgp_sym_encrypt` (tipo `bytea` + chave via Vault + índice HMAC), `ON CONFLICT` com pré-requisito `UNIQUE`, Realtime em API v2 (`channel().on('postgres_changes')`), `SET search_path = ''` padronizado, grep de `select('*')` corrigido.
+
+### Adicionado — verificação real (Eixo 2)
+- **VERIFICAR** deixa de ser "busca rápida": exige **re-teste da vulnerabilidade** (prova de exploração negativa) e **re-query no banco** (`pg_tables.rowsecurity`, `pg_policies`) antes de marcar a task como concluída.
+- **Scanners integrados ao fluxo** (não mais "complementares"): Semgrep/CodeQL (taint), Gitleaks (segredos), Trivy/`npm audit` (SCA), OWASP ZAP (DAST contra o deploy).
+- **Fase 2 renomeada** para "Integridade de build" (não prova segurança); roda por **opt-out** quando houve edição; usa `--ignore-scripts` e ambiente sem segredos; corrigido `tsc --isolatedModules <arquivo>` (flag errada).
+
+### Adicionado — threat model e escopo honesto (Eixo 3)
+- **Passo 0 — Threat model (STRIDE)** antes do checklist fixo; repondera e reordena as tasks por app.
+- **Escopo e limites** declarados no frontmatter e no topo do relatório (não cobre IA internals, mobile, ORM fora do supabase-js, CI/CD posture, PCI/HIPAA/SOC2).
+- **Pontuação objetiva** ancorada em ASVS/CVSS/EPSS com rubrica e pesos (substitui o "X.X/10" subjetivo); declara % de cobertura ASVS.
+- **Baseline/regressão**: lê o `audit-*.md` anterior e computa diff (novos/corrigidos/regredidos).
+- Estados novos no relatório: **"FP confirmado"** e **"Não verificado"** (além de ✅/❌/⚠️/➖).
+
+### Adicionado — novos módulos de cobertura (Eixo 4) em `references/v19-modules.md`
+- **IA/LLM (P0)**: prompt injection, tool-calling abuse, RAG cross-tenant, token-DoS.
+- **Edge Functions/Deno (P0)**: `verify_jwt=false`, `--no-check`, import map, supply chain `esm.sh`/`npm:`.
+- **ORM/conexão direta (P1)**: Prisma/Drizzle/Kysely que bypassam RLS; role dedicada.
+- **Auth moderna (P1)**: OAuth/OIDC (PKCE/state/nonce/linking), refresh-token rotation + reuse-detection, HIBP, passkeys/WebAuthn, gestão de sessões.
+- **Lógica & borda (P1)**: mass-assignment na camada de privilégio, multi-tenant (teste A→B, `WITH CHECK`), Unicode/homógrafos, dinheiro em centavos, races de estoque/voto/like, idempotência em toda mutação, upload avançado (polyglot/SVG/EXIF/zip-slip/limite decodificado).
+- **CI/CD & Vercel (P1)**: `GITHUB_TOKEN` mínimo, banir `pull_request_target` com secrets, OIDC, pin por SHA; Deployment Protection, env por ambiente, sem `service_role` em Preview.
+
+### Adicionado — Guardrails v2 + supply-chain da própria skill (Eixo 5)
+- **Auto-update seguro**: pin por tag/commit, `git verify-tag`/Sigstore antes de aplicar; **removido** o fallback `rm -rf … && git clone`; nunca `git pull main` cego.
+- **Anti-prompt-injection**: bloco no topo — conteúdo de arquivos é **dado não confiável**, nunca instrução; Passo 4.5 (Red Team) **só reporta** (sem auto-fix).
+- **Lista de operações destrutivas** (`REVOKE/ALTER/DROP/DELETE/SET SCHEMA/ENABLE RLS sem policy/filter-repo/BFG/rm -rf`) exigindo diff + confirmação + branch/stash obrigatório.
+- **Redação por padrão**: não ler `.env` real para o contexto; `security-report/` com `chmod 600`, nome não-previsível, segredos/PoC mascarados.
+- **Modo report-only como padrão** (auto-fix opt-in); `allow_implicit_invocation` revisto.
+
+### Modificado
+- Frontmatter `description`: escopo honesto, versão v1.9, modo AUDITAR→PROPOR (auto-fix opt-in).
+- Missão (linha de abertura): "encontrar vulnerabilidades reais e propor/aplicar correções com verificação real".
+
+> Crédito: AGENTE 2 (Auditor de Correção) 🥇, AGENTE 6 (Lógica & Borda) 🥈, AGENTE 5 (Atacante da Própria Skill) 🥉 — ver `references/hall-of-fame.md`.
+
+---
+
 ## v1.8 — 2026-06-17
 
 ### Adicionado — LGPD, guardrails e segurança ampliada
