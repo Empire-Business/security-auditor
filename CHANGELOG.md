@@ -4,18 +4,26 @@ Histórico de versões e melhorias da skill. Ao fazer qualquer atualização fut
 
 ---
 
-## Não lançado (edição local, ainda sem tag/versão)
+## v1.11 — 2026-07-17 (edição local, ainda sem tag/versão)
 
-### Modo Pentest — squad de agentes adversariais competitivos (oferecido, opt-in)
+### Fluxos de Autenticação Completos, supply-chain (Shai-Hulud), validação dual-camada, dados sensíveis em logs e extensão do Modo Pentest
 
-Ajuste pedido pelo usuário: ao rodar a verificação de segurança, a skill deve oferecer um pentest multi-agente onde cada agente é "recompensado" por falhas reais encontradas, com framing rigoroso e faminto por achar problemas.
+Leva de melhorias focada em três pontas: fechar os fluxos de autenticação que a IA gera errado com mais frequência (senha temporária, recuperação de senha, OTP), incorporar o aprendizado do incidente real Shai-Hulud (npm supply-chain worm) na cobertura de dependências, e expandir a superfície do Modo Pentest e do relatório para essas novas categorias.
 
 ### Adicionado
-- **Nova seção "Oferta de Modo Pentest"** (antes do Passo 0): sempre que um trigger de auditoria dispara, a skill oferece (nunca ativa sozinha) rodar um squad de 3-5 agentes adversariais em paralelo, cada um com uma lente diferente (autorização/IDOR, injeção, lógica de negócio/race conditions, segredos, supply-chain).
-- **Sistema de pontuação com salvaguarda anti-reward-hacking**: pontos só são atribuídos após verificação independente do achado (mesmo padrão de re-teste + re-query já usado na skill); achado não verificado marca "reportado, não confirmado" e vale zero pontos — evita que o incentivo de "recompensa" leve agentes a inventar vulnerabilidades falsas para pontuar. Pontuação por severidade (P0 > P1 > P2), duplicata entre agentes conta uma vez.
-- **Relatório do Modo Pentest**: placar por agente/lente, achados confirmados vs. não confirmados, e o valor incremental (achados que o squad pegou e a auditoria sistemática sozinha não pegaria). Achados confirmados entram na mesma pipeline de correção e gate `verdict.json` já existentes — sem regras de gate diferentes.
-- **Passo 4.5 (Red Team single-agent)** agora referencia o Modo Pentest como a versão ampliada do mesmo adversarial testing.
-- **Trigger phrases** no frontmatter ganham "pentest", "modo pentest", "esquadrão de agentes de segurança".
+- **Nova categoria "Fluxos de Autenticação Completos"** (P0/P1): §3e — criação de usuário com senha temporária/padrão (força de troca no primeiro login); §20k — recuperação de senha (entropia, expiração e uso único do token de reset); §20l — login via código OTP (força, expiração, uso único e rate-limit de verificação). Detalhamento e payloads de teste em `references/audit-details.md`.
+- **§20m — Validação dual-camada**: exige schema compartilhado client/server (não só validação no componente React) para os limites já cobertos em §18b (tamanho máximo), §19b (ReDoS) e §20e (Zod `.strict()`), contornável por qualquer requisição feita fora do browser.
+- **Supply-chain — aprendizado do incidente real Shai-Hulud** (worm de auto-replicação via npm, 2025-2026): §6b — critério de severidade para pacotes desatualizados sem CVE catalogado (staleness); §6c — vulnerabilidades reportadas na janela de 90 dias pós-disclosure e padrões suspeitos de publish/maintainer; §6d (P0) — indicadores de comprometimento (IoC) tipo worm: `postinstall` suspeito, maintainer novo sem justificativa, lockfile drift, transitivas não auditadas. Checklist de IoC em `references/infrastructure.md`; aprendizado incorporado documentado em `references/hall-of-fame.md`.
+- **§27f — Dados sensíveis em logs**: mapeia secrets/PII expostos em logs públicos ou de baixa proteção e cobre redaction por ferramenta (Sentry `beforeSend`, Datadog Sensitive Data Scanner/`scrubbing_rules`, Vercel Logs via allowlist explícita de campos, já que não tem redaction nativo). Referência cruzada com §20j (stack traces) e §26 (LGPD).
+- **Extensão de prompt injection no app auditado** (`references/v19-modules.md`): reforço da cobertura de isolamento de conteúdo não confiável, allowlist de tool-calling e resistência a instrução injetada, agora também como lente dedicada no Modo Pentest e gatilho de oferta direcionada em achado P0.
+- **Reforço de CSRF form-based** em §20g: cobertura adicional para mutações via `<form>` tradicional (não só fetch/XHR), além da verificação de `origin` já existente.
+- **Extensão do Modo Pentest**: novas lentes disponíveis para o squad — fluxos de autenticação completos, exposição de dados em logs, prompt injection no app auditado; e nova oferta direcionada (não é auto-disparo) sempre que o ciclo AUDITAR → CORRIGIR → VERIFICAR confirma, com re-teste + re-query, um achado P0 nessas categorias ou de gravidade equivalente — a skill pergunta se o usuário quer escalar para uma lente focada do Modo Pentest.
+- **Novas tasks no Passo 1**: `3e`, `20k`, `20l`, `20m`, `6c`, `6d`, `27f` adicionadas ao plano de tasks; contagem de categorias-base atualizada de 38 para 62.
+
+### Corrigido
+- **Referências cruzadas quebradas** apontando para seções inexistentes em `references/audit-details.md` (`"Server Actions como endpoints públicos"`, `"JWT algorithm lock"`, `"SQL Injection"`, `"Realtime avançado"`, `"Data Access Layer"`) — repontadas para os títulos reais das seções existentes, ou removidas quando não havia conteúdo correspondente.
+- **`## Passo 3: Relatório final`** referenciava `task #28`, que não existe mais na numeração atual do plano (a task de relatório final é `#36`); corrigido para `task #36`.
+- **Tabela "Arquivos de referência"** atualizada para citar a cobertura de redaction de logs por ferramenta em `references/infrastructure.md`.
 
 ### Nota
 Esta entrada ainda não foi commitada nem tagueada no repositório `Empire-Business/security-auditor` — é uma edição local. Propagação para outras máquinas/projetos depende do fluxo de update verificado (tag/SHA pinado) já existente na skill.

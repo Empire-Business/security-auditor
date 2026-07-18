@@ -63,3 +63,22 @@ Em 2026-07-10, 4 agentes atacaram a **costura** entre as duas skills (não a aud
 
 ## Como o resultado virou código (v1.10)
 `security-report/verdict.json` + gate fail-closed na omnx-code (recusa push/merge sem `gate: PASS`); `version`/`contract_version` nos frontmatters; update `git verify-tag && git checkout` (verificar antes), sem `|| echo`, sem `--ff-only`, com allowlist/SHA e `curl -fsSL`; Passo 0 de varredura de instalações irmãs; gate espelhado no `AGENTS.md`; self-update por último + reload; copy honesta.
+
+---
+
+# Aprendizado incorporado — Incidente real Shai-Hulud (npm supply-chain worm)
+
+Diferente das rodadas de red-team internas, este aprendizado veio de um incidente real do ecossistema npm (Shai-Hulud, 2025-2026), não de ataque simulado contra a própria skill.
+
+## O que aconteceu
+O worm comprometeu contas de mantenedores npm legítimos e publicou versões maliciosas com scripts `postinstall` que roubavam tokens (npm, GitHub, cloud), usando-os para se auto-publicar em novos pacotes da própria vítima — replicação em cadeia sem depender de CVE nova.
+
+## Gap que isso expôs
+Até v1.10, §6/§22b cobriam CVE catalogada, lockfile commitado e `npm ci` — mas não instruíam a procurar indicadores de comprometimento tipo worm quando não há CVE formal.
+
+## Como virou código
+- §6b — critério de severidade para staleness
+- §6c — janela de 90 dias pós-disclosure via GHSA/OSV.dev, padrão suspeito de publish/maintainer
+- §6d (P0) — IoC de worm: postinstall suspeito, maintainer novo sem justificativa, lockfile drift, transitivas não auditadas
+- `references/infrastructure.md` → checklist de IoC tipo worm
+- Escopo mantido complementar ao omnx-code (regra 15): instalação fica lá, auditoria de projeto existente fica aqui.

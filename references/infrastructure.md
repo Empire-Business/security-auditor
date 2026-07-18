@@ -9,6 +9,9 @@
 - [Schema exposure — private schema e permissões](#schema)
 - [LGPD/GDPR — checklist de conformidade](#lgpd)
 - [Supply chain security](#supply-chain)
+- [Indicadores de comprometimento tipo worm (pós-Shai-Hulud)](#supply-chain-ioc)
+- [Staleness vs. vulnerabilidade — critério de severidade](#supply-chain-staleness)
+- [Logging & observabilidade — redaction por ferramenta](#logging)
 
 ---
 
@@ -356,3 +359,48 @@ jobs:
         run: |
           npx secretlint "**/*" || true
 ```
+
+### Indicadores de comprometimento (IoC) tipo worm — pós-Shai-Hulud {#supply-chain-ioc}
+
+Checklist de IoC (não depende de CVE catalogada):
+- [ ] Nenhum script postinstall/preinstall/install desconhecido roda em CI sem `--ignore-scripts` ou allowlist
+- [ ] Nenhum maintainer adicionado a dependência crítica nos últimos 90 dias sem commit/PR correspondente
+- [ ] Nenhuma divergência de hash `integrity` no lockfile para versão semver já existente
+- [ ] `npm ci`/`pnpm install --frozen-lockfile` em todo pipeline de CI
+- [ ] Dependências transitivas incluídas na varredura
+- [ ] Tokens de longa duração com escopo mínimo e rotação recente
+
+```bash
+find node_modules -maxdepth 2 -name package.json -exec grep -l '"postinstall"\|"preinstall"' {} \; 2>/dev/null
+npm ci --dry-run 2>&1 | grep -i "EINTEGRITY\|resolved"
+npm view <pacote-suspeito> maintainers
+```
+
+Correção imediata se IoC confirmado: revogar/rotacionar tokens npm/GitHub/cloud, remover pacote suspeito, reinstalar de lockfile conhecido-bom, tratar como incidente de segurança.
+
+### Staleness vs. vulnerabilidade — critério de severidade {#supply-chain-staleness}
+
+| Situação | Severidade |
+|----------|-----------|
+| CVE crítica/alta sem patch | P0 |
+| Major atrás com fix não catalogado | P0 |
+| Major atrás, sem CVE, fora de manutenção | P1 |
+| Minor/patch atrás, mantido ativamente | P2 |
+
+## Logging & observabilidade — redaction por ferramenta {#logging}
+
+Complemento de SKILL.md §27f (Dados sensíveis em logs) — configuração de redaction por ferramenta de log agregado.
+
+- **Sentry**: use `beforeSend`/`beforeSendTransaction` para remover qualquer campo sensível, não só `user.email`/`user.ip_address` (já coberto em §26 LGPD):
+  ```typescript
+  Sentry.init({
+    beforeSend(event) {
+      if (event.request?.headers) delete event.request.headers['authorization']
+      if (event.extra) { delete event.extra.password; delete event.extra.token }
+      return event
+    },
+  })
+  ```
+- **Datadog**: habilitar Sensitive Data Scanner no dashboard, ou `logs_config.scrubbing_rules` no agent config para mascarar padrões (`\bBearer\s+[\w-]+\b`, CPF, cartão).
+- **Vercel Logs**: sem redaction nativo — a única defesa é allowlist explícita de campos logados no próprio código (nunca `console.log(objetoCompleto)`; sempre `console.log({ campo1, campo2 })`).
+- **Regra geral**: trate qualquer sistema de log agregado como superfície pública — o mesmo padrão de "nunca logar o valor, só metadados" de §27f se aplica independente da ferramenta.

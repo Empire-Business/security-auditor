@@ -9,6 +9,7 @@ Referência completa com SQL queries, padrões de código e exemplos de correç�
 - [Ferramentas complementares](#ferramentas)
 
 > **v1.6:** Adicionadas seções — Enumeração de usuários, Input size limits, Rate limiting honeypots, Race conditions (cenários concretos), Upload (IP trackers), Testes de segurança TDD
+> **v1.11:** Adicionadas seções — Criação de usuário com senha temporária, Recuperação de senha (token), Login via código OTP
 
 ---
 
@@ -234,6 +235,41 @@ LEFT JOIN pg_policies p ON t.tablename = p.tablename AND p.schemaname = 'public'
 WHERE t.schemaname = 'public'
 GROUP BY t.tablename, t.rowsecurity
 ORDER BY t.rowsecurity ASC, t.tablename;
+```
+
+---
+
+### Criação de usuário com senha temporária/padrão
+
+**Checklist técnico:**
+- [ ] Senha temporária gerada com CSPRNG (`crypto.randomBytes`), não `Math.random()` nem string fixa
+- [ ] Comprimento/entropia equivalente a senha forte (≥ 16 bytes aleatórios em base64url)
+- [ ] Flag "deve trocar senha" gravada em `app_metadata` (nunca `user_metadata`)
+- [ ] Middleware/guard bloqueia toda rota exceto `/change-password`/`/logout` enquanto a flag estiver ativa — inclusive chamadas de API/Server Actions
+- [ ] Flag limpa só no servidor, após confirmar nova senha definida
+- [ ] Nenhum log grava o valor da senha temporária
+- [ ] Se usa link de primeiro acesso: expira (≤ 24-48h) e é single-use
+
+```bash
+grep -rnE "Math\.random\(\)|Mudar123|Temp@123|Welcome123|senha.*padrão|DEFAULT_PASSWORD" \
+  src/ app/ supabase/functions/ --include="*.ts" --include="*.tsx"
+grep -rnE "console\.(log|info|debug)\(.*\b(temp|temporary|tempPassword|senha)\b" \
+  src/ app/ supabase/functions/ --include="*.ts" --include="*.tsx" -i
+```
+
+**Payload de teste:**
+1. Admin cria usuário com senha temporária. Login sucede, mas qualquer chamada subsequente (Server Action/Route Handler direto via fetch, ignorando UI) deve recusar até a troca:
+   ```typescript
+   const res = await fetch('/api/dashboard-data', { headers: { Authorization: `Bearer ${sessionWithTempPasswordFlag}` } })
+   expect(res.status).toBe(403)
+   ```
+2. Após trocar, confirme flag `false` persistida no banco (não só na sessão em memória).
+3. Tente reutilizar a senha temporária antiga — deve falhar.
+
+```typescript
+// Sanity check de entropia (10.000 gerações, sem colisão)
+const passwords = Array.from({ length: 10000 }, () => generateTempPassword())
+expect(new Set(passwords).size).toBe(10000)
 ```
 
 ---
@@ -804,6 +840,72 @@ CREATE POLICY "Prevenir path traversal"
     name NOT LIKE '%..%'
   );
 ```
+
+---
+
+### Recuperação de senha — token
+
+**Três propriedades obrigatórias do token:** (1) entropia ≥128 bits CSPRNG, (2) expiração 15-60min, (3) uso único — invalidar após troca bem-sucedida E invalidar tokens anteriores ao emitir um novo.
+
+```sql
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'password_resets' AND table_schema = 'public';
+SELECT id, email FROM public.password_resets WHERE expires_at IS NULL;
+```
+```bash
+grep -rn "password_resets\|reset_token" src/ app/ supabase/functions/ --include="*.ts" | grep -v "token_hash\|createHash"
+```
+Se o token é comparado direto (`WHERE token = $1`) em vez de por hash, vazamento de banco expõe tokens ativos — sempre armazenar `sha256(token)`.
+
+**Referrer leakage — checklist:**
+- [ ] `Referrer-Policy: no-referrer` nas rotas `/reset-password`, `/update-password`, `/forgot-password`
+- [ ] Nenhum script de terceiro nessas páginas
+- [ ] Error tracker global (Sentry) faz scrub de `window.location.href` antes de reportar
+
+```bash
+grep -rln "gtag\|analytics\|hotjar\|clarity\|intercom\|drift\|fullstory\|sentry" \
+  src/app/reset-password src/app/update-password app/reset-password app/update-password \
+  pages/reset-password pages/update-password 2>/dev/null
+```
+
+**Payload de teste:** solicitar reset, aguardar expiração e confirmar rejeição; usar token uma vez e tentar reutilizar; solicitar dois resets seguidos e confirmar que o primeiro token foi invalidado; checar header Referrer de requests de terceiro na página de reset.
+
+### Login via código OTP
+
+O ponto que mais escapa de auditorias superficiais: **rate-limit na verificação**, não só na geração.
+
+**Checklist técnico:**
+- [ ] Código ≥6 dígitos, CSPRNG (`crypto.randomInt`)
+- [ ] Expiração 5-10min
+- [ ] Uso único — invalidado após verificação bem-sucedida
+- [ ] Reenvio invalida código anterior
+- [ ] Rate-limit na verificação — máx 5 tentativas antes de invalidar
+- [ ] Rate-limit também na geração/reenvio (independente do de verificação)
+- [ ] Código nunca retornado na resposta/headers/logs
+- [ ] Comparação contra hash armazenado
+
+```bash
+grep -rnE "Math\.random\(\).{0,40}(otp|code|OTP)" src/ app/ supabase/functions/ --include="*.ts" --include="*.tsx" -i
+grep -rl "verifyOtp\|verify.*[Oo][Tt][Pp]\|checkOtp\|validateCode" src/ app/ supabase/functions/ \
+  --include="*.ts" --include="*.tsx" | xargs grep -L "attempts\|rateLimit\|ratelimit\|lockout\|max.*tries" 2>/dev/null
+grep -rnE "(debug_otp|return.*\{[^}]*\botp\b|json\(\{[^}]*\bcode\b.*otp)" \
+  src/ app/ supabase/functions/ --include="*.ts" --include="*.tsx" -i
+```
+
+**Payload de teste — brute-force do endpoint de verificação:**
+```typescript
+async function bruteForceOtp(email: string) {
+  for (let i = 0; i <= 20; i++) {
+    const code = i.toString().padStart(6, '0')
+    const res = await fetch('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, code }) })
+    if (res.status === 429 || (await res.json()).error?.includes('Muitas tentativas')) {
+      console.log(`Bloqueado após ${i + 1} tentativas — OK`); return
+    }
+  }
+  console.log('⚠️ Nenhum bloqueio detectado após 21 tentativas — VULNERÁVEL')
+}
+```
+Se o teste completa sem bloqueio, é achado P0 confirmado.
 
 ---
 
