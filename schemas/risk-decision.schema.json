@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "risk-decision",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^RISK-[A-Za-z0-9-]{3,90}$"
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "basis_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "merge",
+        "deploy"
+      ]
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "snapshot_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "control_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^SEC-[A-Z]+-[0-9]{2}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "issued_at": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 40
+    },
+    "expires_at": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 40
+    },
+    "mitigation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "task_ref": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9-]{2,100}$"
+    },
+    "provenance": {
+      "type": "string",
+      "enum": [
+        "local_attestation",
+        "external_attestation"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "actor",
+    "basis_ref",
+    "operation",
+    "environment",
+    "snapshot_digest",
+    "control_ids",
+    "issued_at",
+    "expires_at",
+    "mitigation",
+    "task_ref",
+    "provenance"
+  ],
+  "additionalProperties": false
+}

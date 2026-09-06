@@ -1,0 +1,168 @@
+{
+  "status": "pass",
+  "executed_at": "2026-09-06T21:48:22.080716+00:00",
+  "oracle": "jsonschema 4.26.0",
+  "checks": [
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/contracts/audit-request.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/contracts/audit-response.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/checkpoint.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/method-lock.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/migration-journal.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/migration-plan.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/project.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/release.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/risk-decision.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "omnx-code/schemas/task.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/contracts/audit-request.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/contracts/audit-response.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/checkpoint.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/method-lock.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/migration-journal.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/migration-plan.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/project.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/release.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/risk-decision.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "schema_definition",
+      "path": "security-auditor/schemas/task.schema.json",
+      "status": "pass"
+    },
+    {
+      "check": "example_against_independent_jsonschema",
+      "path": "omnx-code/examples/audit.request.json",
+      "status": "pass"
+    },
+    {
+      "check": "example_against_independent_jsonschema",
+      "path": "omnx-code/examples/audit.response-template.json",
+      "status": "pass"
+    },
+    {
+      "check": "frontmatter",
+      "path": "omnx-code/SKILL.md",
+      "description_chars": 408,
+      "core_lines": 171,
+      "nonempty_lines": 136,
+      "status": "pass"
+    },
+    {
+      "check": "example_against_runtime_semantic_validator",
+      "path": "omnx-code/examples",
+      "status": "pass"
+    },
+    {
+      "check": "scenarios_parse",
+      "path": "omnx-code/evals/scenarios.json",
+      "status": "pass",
+      "note": "Parsing only; no behavioral/model evaluation executed."
+    },
+    {
+      "check": "example_against_independent_jsonschema",
+      "path": "security-auditor/examples/audit.request.json",
+      "status": "pass"
+    },
+    {
+      "check": "example_against_independent_jsonschema",
+      "path": "security-auditor/examples/audit.response-template.json",
+      "status": "pass"
+    },
+    {
+      "check": "frontmatter",
+      "path": "security-auditor/SKILL.md",
+      "description_chars": 373,
+      "core_lines": 151,
+      "nonempty_lines": 118,
+      "status": "pass"
+    },
+    {
+      "check": "example_against_runtime_semantic_validator",
+      "path": "security-auditor/examples",
+      "status": "pass"
+    },
+    {
+      "check": "scenarios_parse",
+      "path": "security-auditor/evals/scenarios.json",
+      "status": "pass",
+      "note": "Parsing only; no behavioral/model evaluation executed."
+    }
+  ],
+  "limitations": [
+    "Definition/example validation is not a proof that every application or model behavior is correct."
+  ]
+}

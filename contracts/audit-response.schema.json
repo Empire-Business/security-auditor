@@ -1,0 +1,439 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "audit-response",
+  "type": "object",
+  "properties": {
+    "contract_version": {
+      "const": "2.0"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^ARQ-[A-Za-z0-9-]{3,90}$"
+    },
+    "audit_id": {
+      "type": "string",
+      "pattern": "^AUD-[A-Za-z0-9-]{3,90}$"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9-]{2,100}$"
+        }
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "design",
+        "delta",
+        "full"
+      ]
+    },
+    "execution_status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "partial",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "review_kind": {
+      "type": "string",
+      "enum": [
+        "self_review",
+        "specialist_review",
+        "external_review"
+      ]
+    },
+    "snapshot_content_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "control_registry_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "surface_discovery_status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "partial",
+        "not_started"
+      ]
+    },
+    "unassessed_surfaces": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "maxItems": 100
+    },
+    "control_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "control_id": {
+            "type": "string",
+            "pattern": "^SEC-[A-Z]+-[0-9]{2}$"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "added"
+            ]
+          },
+          "assessment": {
+            "type": "string",
+            "enum": [
+              "evaluated",
+              "deferred",
+              "unsupported"
+            ]
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9-]{2,100}$"
+            },
+            "maxItems": 100,
+            "uniqueItems": true
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "limitation_code": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            ]
+          }
+        },
+        "required": [
+          "control_id",
+          "origin",
+          "assessment",
+          "result",
+          "evidence_ids",
+          "rationale",
+          "limitation_code"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 200
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^FIND-[A-Za-z0-9-]{3,90}$"
+          },
+          "control_id": {
+            "type": "string",
+            "pattern": "^SEC-[A-Z]+-[0-9]{2}$"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9-]{2,100}$"
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "informational"
+            ]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "actor_or_condition": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "consequence": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "remediation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "exposure": {
+            "type": "string",
+            "enum": [
+              "in_scope",
+              "known_exposed",
+              "out_of_scope_unknown"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "control_id",
+          "evidence_ids",
+          "severity",
+          "confidence",
+          "actor_or_condition",
+          "consequence",
+          "remediation",
+          "exposure"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 200
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9-]{2,100}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "static",
+              "test",
+              "configuration",
+              "external_reference",
+              "design"
+            ]
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            ]
+          },
+          "file_sha256": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "observed",
+              "not_run"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "observed_at": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 40
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "reference",
+          "result",
+          "environment",
+          "observed_at",
+          "summary"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 400
+    },
+    "out_of_scope_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "code",
+          "summary"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 100
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "code",
+          "summary"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 100
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "tool_calls": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0
+            }
+          ]
+        },
+        "tokens_actual": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0
+            }
+          ]
+        },
+        "tokens_estimated": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0
+            }
+          ]
+        }
+      },
+      "required": [
+        "tool_calls",
+        "tokens_actual",
+        "tokens_estimated"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "contract_version",
+    "request_id",
+    "audit_id",
+    "project_id",
+    "task_id",
+    "mode",
+    "execution_status",
+    "review_kind",
+    "snapshot_content_digest",
+    "policy_digest",
+    "control_registry_digest",
+    "surface_discovery_status",
+    "unassessed_surfaces",
+    "control_results",
+    "findings",
+    "evidence",
+    "out_of_scope_observations",
+    "limitations",
+    "metrics"
+  ],
+  "additionalProperties": false
+}

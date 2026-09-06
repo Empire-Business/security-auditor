@@ -1,0 +1,52 @@
+{
+  "contract_version": "2.0",
+  "request_id": "ARQ-example-only",
+  "project_id": "11111111-1111-4111-8111-111111111111",
+  "task_id": null,
+  "orchestrator_id": null,
+  "mode": "delta",
+  "objective": "EXEMPLO SINTÉTICO: preencher somente após revisão real.",
+  "security_impact": "S2",
+  "snapshot": {
+    "kind": "filesystem",
+    "base_revision": null,
+    "head_revision": null,
+    "content_digest": "d69ab747817cf554c58949c255dfec81369cb7b3e20205372bc39286312dfb2c",
+    "files": [
+      {
+        "path": "handler.py",
+        "sha256": "72498bed6ff66a55768a09b06da8e882faf3979695daae4b21e32831b358dd4c",
+        "git_index_blob": null
+      }
+    ],
+    "environment": "example-local",
+    "environment_observed": false,
+    "environment_config_digest": null
+  },
+  "policy_digest": "34605803a775fc98acb9ac50fa22bf0332470920984772c7e9bde5e38b529382",
+  "control_registry_digest": "54ba87d0b7d3046a6bb809c7d168b07c994d1f1f2392586d0f5e5a8ca458ca04",
+  "changed_paths": [
+    "handler.py"
+  ],
+  "surfaces": [
+    "example-input"
+  ],
+  "requested_controls": [
+    "SEC-INPUT-01"
+  ],
+  "evidence_refs": [],
+  "permissions": {
+    "application_writes": false,
+    "network_access": false,
+    "allowed_network_targets": [],
+    "sandbox_test_execution": false,
+    "production_access": false
+  },
+  "budget": {
+    "max_related_files": 30,
+    "max_tool_calls": 30,
+    "max_output_tokens": 2500,
+    "max_correction_cycles": 2
+  },
+  "expansion_policy": "related_dependencies_with_reason"
+}

@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "migration-plan",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "migration_id": {
+      "type": "string",
+      "pattern": "^MIG-[a-f0-9]{24}$"
+    },
+    "plan_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "root_identity": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "init",
+        "legacy",
+        "adoption"
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 3000
+    },
+    "mappings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "block_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9-]{2,100}$"
+          },
+          "block_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "instruction",
+              "requirement",
+              "initiative",
+              "task",
+              "architecture",
+              "decision",
+              "guide",
+              "session",
+              "history",
+              "obsolete_template"
+            ]
+          },
+          "treatment": {
+            "type": "string",
+            "enum": [
+              "preserve",
+              "replace",
+              "supersede",
+              "history"
+            ]
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "decision_ref": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            ]
+          }
+        },
+        "required": [
+          "source_path",
+          "block_id",
+          "block_sha256",
+          "category",
+          "treatment",
+          "destination",
+          "reason",
+          "decision_ref"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 10000
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9-]{2,100}$"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "write",
+              "delete"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "before_sha256": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "after_sha256": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "after_base64": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "maxLength": 12582912
+              }
+            ]
+          },
+          "mode": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 511
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "path",
+          "before_sha256",
+          "after_sha256",
+          "after_base64",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 3000
+    },
+    "authority_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "bootstrap": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "explicit_skill",
+            "claude_cli",
+            "codex_native"
+          ]
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "mode",
+        "evidence_ref"
+      ],
+      "additionalProperties": false
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "maxItems": 100
+    }
+  },
+  "required": [
+    "schema_version",
+    "migration_id",
+    "plan_digest",
+    "root_identity",
+    "project_id",
+    "kind",
+    "sources",
+    "mappings",
+    "operations",
+    "authority_ref",
+    "bootstrap",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

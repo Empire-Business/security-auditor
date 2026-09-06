@@ -1,0 +1,18 @@
+{
+  "name": "security-auditor",
+  "version": "2.0.0-rc.1",
+  "specification_revision": "4",
+  "project_schema_version": 1,
+  "audit_contract_versions": [
+    "2.0"
+  ],
+  "control_registry_revision": 1,
+  "python": ">=3.10",
+  "release_stage": "release_candidate",
+  "upstream_reference": {
+    "repository": "https://github.com/Empire-Business/security-auditor",
+    "commit": "ab81f3455a7feeb0e813acc74059a44b7968c1da"
+  },
+  "network_required": false,
+  "telemetry": false
+}

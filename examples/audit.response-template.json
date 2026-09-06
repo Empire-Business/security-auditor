@@ -1,0 +1,42 @@
+{
+  "contract_version": "2.0",
+  "request_id": "ARQ-example-only",
+  "audit_id": "AUD-example-only",
+  "project_id": "11111111-1111-4111-8111-111111111111",
+  "task_id": null,
+  "mode": "delta",
+  "execution_status": "partial",
+  "review_kind": "self_review",
+  "snapshot_content_digest": "d69ab747817cf554c58949c255dfec81369cb7b3e20205372bc39286312dfb2c",
+  "policy_digest": "34605803a775fc98acb9ac50fa22bf0332470920984772c7e9bde5e38b529382",
+  "control_registry_digest": "54ba87d0b7d3046a6bb809c7d168b07c994d1f1f2392586d0f5e5a8ca458ca04",
+  "surface_discovery_status": "not_started",
+  "unassessed_surfaces": [
+    "example-input"
+  ],
+  "control_results": [
+    {
+      "control_id": "SEC-INPUT-01",
+      "origin": "requested",
+      "assessment": "deferred",
+      "result": "unknown",
+      "evidence_ids": [],
+      "rationale": "Revisão ainda não executada.",
+      "limitation_code": "NOT_RUN"
+    }
+  ],
+  "findings": [],
+  "evidence": [],
+  "out_of_scope_observations": [],
+  "limitations": [
+    {
+      "code": "NOT_RUN",
+      "summary": "Este é um molde, não uma auditoria executada."
+    }
+  ],
+  "metrics": {
+    "tool_calls": null,
+    "tokens_actual": null,
+    "tokens_estimated": null
+  }
+}

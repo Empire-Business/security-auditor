@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "owner": "security-auditor",
+  "controls": [
+    {
+      "id": "SEC-AUTHN-01",
+      "revision": 1,
+      "title": "Validar identidade e sessão no caminho real",
+      "applies_when": "login, sessão, tokens ou validação de identidade mudam",
+      "module_ref": "controls/modules/authentication.md",
+      "acceptable_evidence": "Teste do fluxo real com token inválido/expirado e caso permitido; configuração compatível com o provedor.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-AUTHN-02",
+      "revision": 1,
+      "title": "Revogação e recuperação não ampliam privilégio",
+      "applies_when": "logout, recuperação, MFA, convite ou troca de credencial",
+      "module_ref": "controls/modules/authentication.md",
+      "acceptable_evidence": "Teste de reuso, expiração, identidade errada e revogação no mecanismo efetivo.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-AUTHN-03",
+      "revision": 1,
+      "title": "Claims têm origem e consumo coerentes",
+      "applies_when": "claims personalizados ou autorização derivada de token",
+      "module_ref": "controls/modules/authentication.md",
+      "acceptable_evidence": "Fixture autenticar → obter claim → acessar → negar; credencial normal, não só administrativa.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-AUTHZ-01",
+      "revision": 1,
+      "title": "Autorizar ação e recurso no servidor",
+      "applies_when": "leitura, escrita, função ou efeito protegido",
+      "module_ref": "controls/modules/authorization.md",
+      "acceptable_evidence": "Teste positivo e negativo de acesso direto, sem depender da tela.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-AUTHZ-02",
+      "revision": 1,
+      "title": "Privilégios e revogação respeitam limites",
+      "applies_when": "admin, impersonação, convite, roles ou operações de suporte",
+      "module_ref": "controls/modules/authorization.md",
+      "acceptable_evidence": "Teste de ator comum tentando ação privilegiada e caso administrativo legítimo.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-TENANT-01",
+      "revision": 1,
+      "title": "Isolar recursos na fronteira real de dados",
+      "applies_when": "recursos pertencem a organizações ou usuários distintos",
+      "module_ref": "controls/modules/multi-tenancy.md",
+      "acceptable_evidence": "Usuários comuns A/B: acesso permitido próprio e negado cruzado, incluindo operação afetada.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-TENANT-02",
+      "revision": 1,
+      "title": "Transportar escopo em cache, storage e jobs",
+      "applies_when": "cache, arquivos, URL assinada, export, busca ou execução assíncrona",
+      "module_ref": "controls/modules/multi-tenancy.md",
+      "acceptable_evidence": "Teste cruzado no caminho afetado de cache/storage/job; inspeção da origem de contexto.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-SECRET-01",
+      "revision": 1,
+      "title": "Impedir exposição de segredo privilegiado",
+      "applies_when": "credenciais, logs, config, bundles ou prompts mudam",
+      "module_ref": "controls/modules/secrets.md",
+      "acceptable_evidence": "Referência localizada redigida, natureza da credencial e caminho de exposição demonstrado.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-SECRET-02",
+      "revision": 1,
+      "title": "Armazenar segundo capacidade criptográfica necessária",
+      "applies_when": "armazenamento/verificação/uso de credenciais",
+      "module_ref": "controls/modules/secrets.md",
+      "acceptable_evidence": "Inspeção da finalidade e teste do protocolo; revogação/rotação somente com autorização específica.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-WEBHOOK-01",
+      "revision": 1,
+      "title": "Autenticar conforme protocolo do provedor",
+      "applies_when": "entrada de evento externo",
+      "module_ref": "controls/modules/webhooks.md",
+      "acceptable_evidence": "Teste de credencial ausente, inválida e válida no endpoint real; limites de corpo e acesso relevantes.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-WEBHOOK-02",
+      "revision": 1,
+      "title": "Idempotência precede efeitos e resiste a concorrência",
+      "applies_when": "evento pode repetir ou produzir efeito financeiro/acesso",
+      "module_ref": "controls/modules/webhooks.md",
+      "acceptable_evidence": "Teste concorrente de duplicata, falha entre persistência e efeito e recuperação sem perda/duplicação.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-WEBHOOK-03",
+      "revision": 1,
+      "title": "Ordenar estados e reconciliar reentregas",
+      "applies_when": "cancelamento, estorno, renovação ou evento fora de ordem",
+      "module_ref": "controls/modules/webhooks.md",
+      "acceptable_evidence": "Teste de ordem invertida, replay, conta distinta com mesmo ID e reconciliação.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-PAY-01",
+      "revision": 1,
+      "title": "Validar valores e destinatários com fonte confiável",
+      "applies_when": "checkout, preço, pagamento ou acesso pago",
+      "module_ref": "controls/modules/payments.md",
+      "acceptable_evidence": "Teste de valor/moeda/produto adulterados e caso legítimo com representação monetária adequada.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-PAY-02",
+      "revision": 1,
+      "title": "Preservar consistência de estados e acesso",
+      "applies_when": "assinatura, renovação, reembolso, chargeback ou suspensão",
+      "module_ref": "controls/modules/payments.md",
+      "acceptable_evidence": "Cenários de cancelamento/estorno/renovação e falha parcial em sandbox, com resultado de acesso esperado.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-INPUT-01",
+      "revision": 1,
+      "title": "Impedir injeção na linguagem de destino",
+      "applies_when": "input alcança SQL, shell, template, regex ou interpretador",
+      "module_ref": "controls/modules/input.md",
+      "acceptable_evidence": "Teste malicioso controlado e inspeção de parametrização no sink real.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-INPUT-02",
+      "revision": 1,
+      "title": "Limitar parsing e consumo",
+      "applies_when": "parser, payload, filtros, serialização ou endpoints",
+      "module_ref": "controls/modules/input.md",
+      "acceptable_evidence": "Casos limite, payload grande, tipo inválido e tempo/erro delimitado; sem execução de tags YAML.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-OUTPUT-01",
+      "revision": 1,
+      "title": "Renderizar e serializar sem exposição indevida",
+      "applies_when": "HTML, templates, API responses ou download",
+      "module_ref": "controls/modules/output.md",
+      "acceptable_evidence": "Teste de conteúdo não confiável no contexto real e negativa de campo sensível.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-OUTPUT-02",
+      "revision": 1,
+      "title": "Logs e diagnósticos não vazam dados",
+      "applies_when": "logging, erros, tickets ou observabilidade",
+      "module_ref": "controls/modules/output.md",
+      "acceptable_evidence": "Captura controlada de saída confirma ausência de segredo e falha do próprio diagnóstico é contida.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-OUTPUT-03",
+      "revision": 1,
+      "title": "Políticas do navegador protegem o fluxo sem quebrá-lo",
+      "applies_when": "cookies, CORS, CSP, CSRF, framing ou cabeçalhos",
+      "module_ref": "controls/modules/output.md",
+      "acceptable_evidence": "Inspeção de configuração efetiva mais teste de origem/sessão adversa e fluxo permitido.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-FILE-01",
+      "revision": 1,
+      "title": "Conter paths, uploads e arquivos compactados",
+      "applies_when": "upload, download, extração ou escrita em filesystem",
+      "module_ref": "controls/modules/files.md",
+      "acceptable_evidence": "Fixtures de ../, absoluto, symlink/hardlink, duplicatas e expansão excessiva; nenhum efeito fora da raiz.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-FILE-02",
+      "revision": 1,
+      "title": "Autorizar acesso ao conteúdo armazenado",
+      "applies_when": "download, URL assinada ou publicação de arquivo",
+      "module_ref": "controls/modules/files.md",
+      "acceptable_evidence": "Tentativa por outro usuário/tenant e link expirado no mecanismo real.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-NET-01",
+      "revision": 1,
+      "title": "Evitar SSRF e redirecionamento indevido",
+      "applies_when": "backend obtém URL ou faz chamada controlada por input",
+      "module_ref": "controls/modules/network.md",
+      "acceptable_evidence": "Teste em servidor local isolado de destino proibido/redirecionado, sem sondar infraestrutura real.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-NET-02",
+      "revision": 1,
+      "title": "Delimitar retries, timeout e efeitos externos",
+      "applies_when": "integração, API ou operação remota",
+      "module_ref": "controls/modules/network.md",
+      "acceptable_evidence": "Teste de resposta perdida e retry sem duplicar efeito; timeout/circuito proporcional.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-DATA-01",
+      "revision": 1,
+      "title": "Mudança destrutiva tem alvo e recuperação",
+      "applies_when": "schema, exclusão ou transformação de dados",
+      "module_ref": "controls/modules/data.md",
+      "acceptable_evidence": "Fixture de atualização/restauração e compatibilidade quando versões coexistem; nunca reset real automático.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-DATA-02",
+      "revision": 1,
+      "title": "Minimizar e proteger dados pessoais",
+      "applies_when": "coleta, export, retenção ou dados sensíveis",
+      "module_ref": "controls/modules/data.md",
+      "acceptable_evidence": "Teste de acesso/export/exclusão pertinente e configuração observada sem dados reais.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-SUPPLY-01",
+      "revision": 1,
+      "title": "Verificar origem e integridade de artefatos",
+      "applies_when": "instalação, update, dependência, build ou workflow",
+      "module_ref": "controls/modules/supply-chain.md",
+      "acceptable_evidence": "Digest/fonte verificados antes de execução; teste de alteração e preservação do instalado.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-SUPPLY-02",
+      "revision": 1,
+      "title": "Scripts e CI não ampliam autoridade",
+      "applies_when": "test, postinstall, hooks, workflows ou política",
+      "module_ref": "controls/modules/supply-chain.md",
+      "acceptable_evidence": "Teste/inspeção de permissões e referência confiável da política, não só YAML no PR.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-LLM-01",
+      "revision": 1,
+      "title": "Separar conteúdo recuperado de autoridade",
+      "applies_when": "agent, tool, prompt, issue, RAG ou saída de modelo",
+      "module_ref": "controls/modules/llm.md",
+      "acceptable_evidence": "Fixture de prompt injection tentando exfiltrar segredo/alterar política; limite real de ferramentas declarado.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-LLM-02",
+      "revision": 1,
+      "title": "Preservar isolamento e custo de delegação",
+      "applies_when": "RAG, memória, agentes ou contexto compartilhado",
+      "module_ref": "controls/modules/llm.md",
+      "acceptable_evidence": "Teste cruzado de recuperação e cenário de recursão/estouro com saída parcial explícita.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-OPS-01",
+      "revision": 1,
+      "title": "Vincular evidência ao conteúdo e ambiente",
+      "applies_when": "gate, release ou reuso de auditoria",
+      "module_ref": "controls/modules/operations.md",
+      "acceptable_evidence": "Comparação de manifesto de arquivos/deps, policy/registry e ambiente relevante; recibo velho é rejeitado.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    },
+    {
+      "id": "SEC-OPS-02",
+      "revision": 1,
+      "title": "Respeitar autorização e estado de publicação",
+      "applies_when": "deploy, push com hook, rotação ou efeito O2/O3",
+      "module_ref": "controls/modules/operations.md",
+      "acceptable_evidence": "Registro de autorização e resultado observado; teste de falha e recuperação em ambiente isolado.",
+      "limitations": "Inspeção textual ou scanner sem findings não demonstra, sozinho, comportamento de aplicação ou configuração de produção."
+    }
+  ]
+}

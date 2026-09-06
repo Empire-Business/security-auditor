@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "project",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "paths": {
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "const": ".omnx/tasks"
+        },
+        "brief": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "prd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "roadmap": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "architecture": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "guides": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "ux_proposals": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "required": [
+        "tasks",
+        "brief",
+        "prd",
+        "roadmap",
+        "architecture",
+        "guides",
+        "ux_proposals"
+      ],
+      "additionalProperties": false
+    },
+    "characteristics": {
+      "type": "object",
+      "properties": {
+        "authentication": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "multi_tenant": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "payments": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "public_endpoints": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "personal_data": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "highly_sensitive_data": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "llm_integration": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "audience_non_technical": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "required": [
+        "authentication",
+        "multi_tenant",
+        "payments",
+        "public_endpoints",
+        "personal_data",
+        "highly_sensitive_data",
+        "llm_integration",
+        "audience_non_technical"
+      ],
+      "additionalProperties": false
+    },
+    "policies": {
+      "type": "object",
+      "properties": {
+        "production_operation": {
+          "const": "explicit_authority_required"
+        },
+        "untrusted_code_execution": {
+          "const": "isolated_and_authorized_only"
+        },
+        "task_backend": {
+          "const": "filesystem_directory"
+        }
+      },
+      "required": [
+        "production_operation",
+        "untrusted_code_execution",
+        "task_backend"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "name",
+    "paths",
+    "characteristics",
+    "policies"
+  ],
+  "additionalProperties": false
+}

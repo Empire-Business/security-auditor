@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "checks": [
+    "contract:audit-request.schema.json",
+    "contract:audit-response.schema.json",
+    "contract:default-policy.json",
+    "control-registry",
+    "runtime:distribution.py",
+    "runtime:tasks.py",
+    "runtime:migration.py",
+    "runtime:cli.py",
+    "runtime:core.py",
+    "runtime:sessions.py",
+    "runtime:audit.py",
+    "runtime:project.py",
+    "runtime:__init__.py",
+    "omnx-code:metadata",
+    "omnx-code:syntax-target-python310",
+    "omnx-code:core-references",
+    "security-auditor:metadata",
+    "security-auditor:syntax-target-python310",
+    "security-auditor:core-references"
+  ],
+  "scope": "Static/package checks, not model evaluation or host integration."
+}

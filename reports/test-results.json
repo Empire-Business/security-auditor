@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "package": "security-auditor",
+  "executed_at": "2026-09-06T21:47:41.531027+00:00",
+  "python": "3.13.5",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "tests_run": 48,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "duration_seconds": 1.763,
+  "successful": true,
+  "tests": [
+    {
+      "test": "test_auditor.AuditTests.test_completed_unknown_not_gate_pass",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_design_not_implementation",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_different_snapshot",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_dirty_file_invalidates",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_duplicate_control",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_environment_digest_tampering",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_false_completion",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_git_index_change_invalidates",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_local_commit_not_universal_gate",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_missing_control",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_missing_evidence_for_pass",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_new_file_is_manifested",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_no_automatic_production",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_policy_modified_rejected",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_public_key_not_automatic_secret",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_receipt_idempotency",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_receipt_immutable",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_registry_modified_rejected",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_scan_redacts_before_output",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_secret_path_not_snapshotted",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_synthetic_example_field_rejected",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_template_not_pass",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_tenant_pass_requires_behavior",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_unknown_enum",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_unrelated_file_does_not_invalidate",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.AuditTests.test_valid_local_merge",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_absolute_path",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_cas",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_deep_yaml",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_duplicate_non_string_yaml",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_file_obstructs_directory",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_hardlink_rejected",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_json_duplicate",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_json_nonfinite",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_lock_contention",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_lock_released",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_path_traversal",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_schema_bool_not_int",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_size_limit",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_symlink_rejected",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_timestamp_without_zone",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_unicode_normalization",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_unknown_schema_keyword",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_windows_device",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_yaml_alias",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_yaml_duplicate",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_yaml_executable_tag",
+      "status": "pass"
+    },
+    {
+      "test": "test_auditor.ParserAndFilesystem.test_yaml_timestamp_stays_string",
+      "status": "pass"
+    }
+  ],
+  "model_tokens_actual": null,
+  "host_integration": "not_run",
+  "scope": "Synthetic local runtime fixtures; not a real application audit or real Claude/Codex evaluation."
+}

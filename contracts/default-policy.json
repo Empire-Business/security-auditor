@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "omnx-local-default",
+  "require_independent_review": false,
+  "block_exposed_severities": [
+    "critical",
+    "high"
+  ],
+  "max_receipt_age_hours": 168,
+  "allow_local_risk_exceptions": false,
+  "non_waivable_families": [
+    "SEC-SECRET",
+    "SEC-AUTHZ",
+    "SEC-TENANT",
+    "SEC-SUPPLY",
+    "SEC-DATA"
+  ],
+  "scope": "Local assessment only; does not install branch protection or grant tool permissions."
+}
